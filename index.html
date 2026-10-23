@@ -180,15 +180,28 @@ function hoyRows(){
  if(hd.length){f=hd[hd.length-1];const nd=f>=iso?addD(f):iso;base=S.hoy.filter(r=>r.fecha==f).map(r=>[r.id,r.nombre,nd,r.prod,r.valor,r.valor,done(r.id,r.nombre,r.prod,f)])}
  else{const td=S.tarea.map(t=>t.fecha).filter(Boolean).sort();
   if(td.length){f=td[td.length-1];const nd=f>=iso?addD(f):iso;base=S.tarea.filter(t=>t.fecha==f).map(t=>[t.id,t.nombre||'',nd,t.ind,t.meta,t.meta,t.res])}}
- const rows=base.map(r=>{const p=S.personal.find(x=>x.id&&x.id==r[0]);return[r[0],r[1]||(p?p.nombre:''),...r.slice(2)]}).sort((a,b)=>String(a[1]).localeCompare(String(b[1]))||String(a[3]).localeCompare(String(b[3])));
+ const rows=base.map(r=>{const p=S.personal.find(x=>x.id&&x.id==r[0]);return[r[0],r[1]||(p?p.nombre:''),...r.slice(2)]}).map((r,i)=>({r,i,o:S.personal.findIndex(p=>(r[0]&&p.id==r[0])||(!r[0]&&norm(p.nombre)==norm(r[1])))})).sort((a,b)=>(a.o-b.o)||(a.i-b.i)).map(x=>x.r);
  return{rows,f}}
+const addDay=f=>{const d=new Date(f+'T12:00:00');d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const lastDay=a=>{const d=a.map(r=>r.fecha).filter(Boolean).sort();return d.length?d[d.length-1]:''};
+const nextD=f=>{const i=tod();return(!f||f<i)?i:addDay(f)};
+const wide=(L,PL)=>PL.flatMap(p=>{const x=L.filter(r=>norm(r.ind)==norm(p));return x.length?[x.reduce((s,r)=>s+r.meta,0),x.reduce((s,r)=>s+r.res,0)]:['','']});
+function dyn(k){
+ if(k=='h')return hoyRows().rows;
+ if(k=='v')return S.puntos.map(v=>[v.name,v.ciudad||'',v.resp||'']);
+ if(k=='p')return S.personal.map(p=>[p.id,p.nombre,p.cargo||'',p.punto,p.clave||(S.pins||{})[p.id]||'']);
+ if(k=='c'){const f=lastDay(S.cumpl),nd=nextD(f),ns=S.puntos.map(p=>p.name);S.cumpl.forEach(r=>{if(r.punto&&!ns.some(n=>norm(n)==norm(r.punto)))ns.push(r.punto)});
+  return ns.map(n=>[n,nd,...wide(S.cumpl.filter(r=>r.fecha==f&&norm(r.punto)==norm(n)),PRODS)])}
+ if(k=='t'){const f=lastDay(S.tarea),nd=nextD(f);
+  return S.personal.map(a=>[a.id,a.nombre,nd,...wide(S.tarea.filter(r=>r.fecha==f&&((a.id&&r.id==a.id)||(!r.id&&norm(r.nombre)==norm(a.nombre)))),PRODT)])}
+ return []}
 async function tpl(k){
  const T={v:['Puntos_de_venta',['Punto','Ciudad','Responsable'],[['Nogales Centro','Nogales','Nombre del responsable']]],
  p:['Personal',['Cédula','Nombre','Cargo','Punto','Clave'],[['1001','Nombre del asesor','Asesor','Nogales Centro','1234']]],
  h:['Tarea_de_hoy',['Cédula','Nombre','Fecha','Producto','Valor a realizar','Tarea de ayer','Real de ayer'],[['1001','Nombre del asesor','2026-10-21','Chance',120,100,95],['1001','Nombre del asesor','2026-10-21','Baloto',60,50,55]]],
  t:['Tarea_diaria',['Cédula','Nombre','Fecha',...PRODT.flatMap(p=>[p+' Meta',p+' Real'])],[['1001','Nombre del asesor','2026-10-21',...PRODT.flatMap((p,i)=>i<2?[100,i?80:112]:['',''])]]],
  c:['Cumplimientos',['Punto','Fecha',...PRODS.flatMap(p=>[p+' Meta',p+' Real'])],[['Nogales Centro','2026-10-21',...PRODS.flatMap((p,i)=>i<2?[100,i?80:112]:['',''])]]]}[k];
- let note='';if(k=='h'){const R=hoyRows();if(R.rows.length){T[2]=R.rows;note='Plantilla descargada con los últimos datos (día '+R.f+'). Cambia la Fecha y los valores a trabajar.'}}
+ let note='';{const R=dyn(k);if(R.length){T[2]=R;note='Plantilla descargada con tu última información. Cambia la fecha y los valores.'}}
  const ws=XLSX.utils.aoa_to_sheet([T[1],...T[2]]);ws['!cols']=T[1].map(()=>({wch:20}));
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,T[0]);if(k=='h')XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Productos válidos'],...PRODT.map(x=>[x])]),'Productos');
  try{const d=await claude.use('downloads');if(!d){S.msg='La descarga no está disponible aquí.';return render()}
@@ -214,13 +227,13 @@ async function loadDB(){
   const[a,pu,fo]=await Promise.all([DB.collection('asesores').get(),DB.collection('puntos').get(),DB.collection('fotos').get().catch(()=>({docs:[]}))]);
   fo.docs.forEach(d=>{const x=d.data();if(x.cedula&&x.foto)S.fotos[did(x.cedula)]=x.foto});
   const cum=[],tar=[],hoy=[],per=[],pts=[];
-  a.docs.forEach(d=>{const x=d.data(),id=x.id||d.id;per.push({id,nombre:x.nombre,cargo:x.cargo,punto:x.punto,clave:''});
+  a.docs.forEach(d=>{const x=d.data(),id=x.id||d.id;per.push({id,nombre:x.nombre,cargo:x.cargo,punto:x.punto,clave:'',ord:x.ord??1e9});S.pins=S.pins||{};if(x.pin)S.pins[id]=x.pin;
    if(x.foto&&!S.fotos[id])S.fotos[id]=x.foto;
    (x.tdias||[]).forEach(r=>tar.push({id,nombre:x.nombre,punto:'',ind:r[1],meta:r[2],res:r[3],periodo:r[0].slice(0,7),fecha:r[0]}));
    (x.hoy||[]).forEach(r=>hoy.push({id,nombre:x.nombre,fecha:r[0],prod:r[1],valor:r[2],ta:r[3],ra:r[4]}))});
-  pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],periodo:r[0].slice(0,7),fecha:r[0]}))});
+  pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp,ord:x.ord??1e9});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],periodo:r[0].slice(0,7),fecha:r[0]}))});
   S.cumpl=mergeRows(cum,S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH);
-  if(!S.personal.length)S.personal=per;if(!S.puntos.length)S.puntos=pts.filter(x=>x.name);
+  if(!S.personal.length)S.personal=per.sort((a,b)=>a.ord-b.ord);if(!S.puntos.length)S.puntos=pts.filter(x=>x.name).sort((a,b)=>a.ord-b.ord);
   S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
  }catch(e){S.msg='No pude cargar el historial guardado.'}
 }
@@ -229,19 +242,20 @@ async function pub(){
  const pts=build();let n=0,np=0;
  try{
   await DB.doc('config/app').set({logo:S.logo||''});
+  let oi=0;
   for(const P of Object.values(pts)){
    if(!P.name||P.name=='Sin asignar')continue;
-   await DB.doc('puntos/'+did(P.name)).set({name:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),dias:capD((P.days||[]).map(d=>[d.f,d.i,d.m,d.r]),300,0)});np++}
+   await DB.doc('puntos/'+did(P.name)).set({ord:oi++,name:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),dias:capD((P.days||[]).map(d=>[d.f,d.i,d.m,d.r]),300,0)});np++}
   for(const p of S.personal){
    if(!p.id)continue;
    const key=Object.keys(pts).find(k=>norm(k)==norm(p.punto))||p.punto,P=pts[key];if(!P)continue;
    const agg={};P.items.forEach(i=>{const a=agg[i.ind]??={ind:i.ind,meta:0,res:0};a.meta+=i.meta;a.res+=i.res});
-   const pin=/^\d{4}$/.test(p.clave)?p.clave:String(p.id).slice(-4),ref=DB.doc('asesores/'+await sha(did(p.id)+':'+pin));
+   const pin=/^\d{4}$/.test(p.clave)?p.clave:((S.pins||{})[p.id]||String(p.id).slice(-4)),ref=DB.doc('asesores/'+await sha(did(p.id)+':'+pin));
    const hm=new Map(),mn=t=>(t.id&&t.id==p.id)||(!t.id&&norm(t.nombre)==norm(p.nombre));
    S.hoy.filter(t=>!t.id&&!t.nombre).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
    S.hoy.filter(t=>t.id||t.nombre).filter(mn).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
    const A=P.ases[p.nombre]||{};
-   await ref.set({nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),id:did(p.id),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),hoy:capD([...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra]),90,0),tdias:capD((A.days||[]).map(d=>[d.f,d.i,d.m,d.r]),150,0),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:(A.items||[]).map(i=>({ind:i.ind,periodo:String(i.periodo||''),meta:i.meta,res:i.res}))});n++}
+   await ref.set({pin:pin,ord:S.personal.indexOf(p),nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),id:did(p.id),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),hoy:capD([...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra]),90,0),tdias:capD((A.days||[]).map(d=>[d.f,d.i,d.m,d.r]),150,0),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:(A.items||[]).map(i=>({ind:i.ind,periodo:String(i.periodo||''),meta:i.meta,res:i.res}))});n++}
   S.msg='Historial guardado: '+n+' asesores y '+np+' puntos. Clave = columna "Clave" del archivo de personal; si no la pones, son los últimos 4 dígitos de la cédula.'
  }catch(e){S.msg='Error al publicar accesos: '+(e.message||e)}
  render();
@@ -283,7 +297,7 @@ function renderAs(){
  const tb=(a)=>`<div class="tw"><table><tr><th>Indicador</th>${a[0]&&a[0].periodo!==undefined?'<th>Periodo</th>':''}<th>Meta</th><th>Real</th><th>%</th></tr>${a.map(i=>`<tr><td>${esc(i.ind)}</td>${i.periodo!==undefined?`<td>${esc(i.periodo)}</td>`:''}<td>${i.meta.toLocaleString()}</td><td>${i.res.toLocaleString()}</td><td>${pill(i.pc,1)}</td></tr>`).join('')}</table></div>`;
  A.innerHTML=`<div class="card"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><div><b style="font-size:17px">${esc(ADV.nombre)}</b><div class="mu">${esc(ADV.cargo)} · ${esc(ADV.punto)}</div>${S.msg?`<div class="mu" style="margin-top:6px">${esc(S.msg)}</div>`:''}<div style="margin-top:10px"><button class="s" onclick="ADV=null;render()">Salir</button></div></div><div style="text-align:center;flex:none">${ADV.foto?`<img class="av" style="width:96px;height:96px" src="${ADV.foto}" alt="Mi foto">`:`<div class="av" style="width:96px;height:96px;display:grid;place-items:center;font-size:40px">👤</div>`}<label class="b" style="display:block;margin-top:6px;padding:6px 8px;font-size:12px">📷 ${ADV.foto?'Cambiar':'Subir'} foto<input type="file" accept="image/*" onchange="myPhoto(this.files[0])"></label></div></div></div>
  <div class="card"><b>🎯 Tu tarea de hoy es</b>${hoyHtml()}</div>
- <div class="card"><div class="row sp"><b>Mi cumplimiento · tarea diaria</b>${pill(pa,m.length)}</div>${bar(pa)}${m.length?tb(m):'<p class="mu">Aún no hay cumplimientos cargados.</p>'}</div>
+ 
  
  <div class="card"><div class="row sp"><b>Mi punto: ${esc(ADV.punto)}</b>${pill(ppd,ptd.length)}</div>${bar(ppd)}${lbl?`<p><b>📅 Cumplimiento del ${esc(lbl)}</b></p>`:''}<p class="mu">${[ADV.ciudad,ADV.resp&&'Resp.: '+ADV.resp].filter(Boolean).map(esc).join(' · ')}</p>${ptd.length?tb(ptd):''}<p><b>📅 Calendario de mi punto</b></p>${calHtml(ADV.dias||[],'c','Chance')}</div>`;
 }
