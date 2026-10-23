@@ -20,6 +20,7 @@ window.claude={use:async n=>{
  if(n=='user'){await authReady;return{isOwner:()=>!!(fauth.currentUser&&fauth.currentUser.email==ADMIN_EMAIL),id:async()=>fauth.currentUser?fauth.currentUser.uid:'anon'}}
  if(n=='downloads')return{save:async({filename,data})=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();a.remove()}};
 }};
+window.addEventListener('hashchange',()=>location.reload());
 function adminForm(){hdr();document.getElementById('app').innerHTML='<div class="card"><b>Acceso del administrador</b><input type="text" id="ae" placeholder="Correo"><input type="text" id="ap" placeholder="Contraseña" style="-webkit-text-security:disc"><button onclick="adminIn()">Entrar</button><p class="mu" id="am"></p></div>'}
 function adminIn(){fauth.signInWithEmailAndPassword(document.getElementById('ae').value.trim(),document.getElementById('ap').value).then(()=>location.reload()).catch(()=>{document.getElementById('am').textContent='Correo o contraseña incorrectos.'})}
 </script>
@@ -263,7 +264,7 @@ function hoyHtml(){const T=tod(),t=HD||T;
  return nav+`<div class="tw"><table><tr><th>Producto</th><th>${t==T?'Hoy':'Tarea'}</th>${ay?'<th>Ayer: tarea</th><th>Real</th><th>%</th>':''}</tr>${L.map(([q,k,v,a,r])=>`<tr><td>${esc(k)}</td><td>${v.toLocaleString()}</td>${ay?`<td>${f(a)}</td><td>${f(r)}</td><td>${a>0&&r!=null?pill(r/a*100,1):'—'}</td>`:''}</tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día anterior</b>${pill(pa,1)}</div>`}`}
 function renderAs(){
  const A=document.getElementById('app');
- const back=isOwn()&&location.hash!='#asesor'?`<button class="s" onclick="ADV=null;S.mode='admin';render()">← Administrador</button>`:'';
+ const back=isOwn()&&location.hash=='#admin'?`<button class="s" onclick="ADV=null;S.mode='admin';render()">← Administrador</button>`:'';
  if(!ADV){A.innerHTML=`<div class="card"><b>Acceso de asesor</b><p class="mu">Ingresa tu cédula y tu clave de 4 dígitos.</p><input type="text" id="ci" inputmode="numeric" placeholder="Cédula"><input type="text" id="cl" inputmode="numeric" maxlength="4" placeholder="Clave (4 dígitos)" style="-webkit-text-security:disc"><div class="row"><button onclick="login()">Ingresar</button>${back}</div><p class="mu">${esc(S.msg)}</p></div>`;return}
  const m=ADV.mine.map(i=>({...i,pc:i.meta?i.res/i.meta*100:0})),pt=ADV.pt.map(i=>({...i,pc:i.meta?i.res/i.meta*100:0})),pa=avg(m);
  const dd=ADV.dias||[],ld=dd.length?dd.map(x=>x[0]).sort().pop():'';let ptd=pt,ppd=ADV.pp,lbl='';
@@ -281,7 +282,7 @@ S.mode=null;render();
  try{DB=await claude.use('db');USR=await claude.use('user')}catch(e){}
  if(DB&&!isOwn()){try{const c=await DB.doc('config/app').get();if(c.exists&&c.data().logo)S.logo=c.data().logo}catch(e){}}
  if(!isOwn()&&location.hash=='#admin'){adminForm();return}
- S.mode=(isOwn()&&location.hash!='#asesor')?'admin':'asesor';render();
+ S.mode=(isOwn()&&location.hash=='#admin')?'admin':'asesor';render();
  if(S.mode=='admin'&&DB){S.msg='Cargando historial guardado…';render();await loadDB();save();render()}
 })();
 </script></body></html>
