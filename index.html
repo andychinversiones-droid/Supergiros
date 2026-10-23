@@ -54,7 +54,7 @@ input[type=file]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-ite
 <script>
 let S={hoy:[],tarea:[],fotos:{},logo:'',puntos:[],personal:[],cumpl:[],punto:null,q:'',msg:''};
 try{const x=localStorage.getItem('zns');if(x)Object.assign(S,JSON.parse(x),{punto:null,q:'',msg:''})}catch(e){}
-const save=()=>{try{localStorage.setItem('zns',JSON.stringify({hoy:S.hoy,tarea:S.tarea,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal,cumpl:S.cumpl}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
+const save=()=>{try{localStorage.setItem('zns',JSON.stringify({tpl:S.tpl,hoy:S.hoy,tarea:S.tarea,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal,cumpl:S.cumpl}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({tpl:S.tpl,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const pick=(r,keys)=>{for(const k of Object.keys(r)){const n=norm(k);if(keys.some(x=>n.includes(x)))return r[k]}return ''};
 const num=v=>{const n=parseFloat(String(v).replace('%','').replace(',','.'));return isNaN(n)?0:n};
@@ -66,6 +66,7 @@ function read(file,kind){
   let hi=aoa.findIndex(r=>r.filter(c=>/cedula|nombre|fecha|producto|punto|valor|ciudad|responsable|cargo|clave/.test(norm(c))).length>=2);if(hi<0)hi=0;
   const hd=(aoa[hi]||[]).map(c=>String(c).trim());
   const rows=aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')).map(r=>{const o={};hd.forEach((k,i)=>{if(k)o[k]=r[i]??''});return o});
+  {const body=aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')),fi=hd.findIndex(c=>norm(c)=='fecha');S.tpl=S.tpl||{};S.tpl[kind]={hd,rows:body.map(r=>hd.map((_,i)=>i==fi?toISO(r[i]):(r[i]??'')))}}
   if(kind=='v')S.puntos=rows.map(r=>({name:String(pick(r,['punto','nombre','sucursal','oficina'])).trim(),ciudad:pick(r,['ciudad','municipio','direccion']),resp:pick(r,['responsable','coordinador','encargado','lider'])})).filter(x=>x.name);else if(kind=='p')S.personal=rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),cargo:pick(r,['cargo']),clave:String(pick(r,['clave','pin'])).trim(),punto:String(pick(r,['punto','sucursal','oficina'])).trim()||'Sin punto'}));
   else if(kind=='t')S.tarea=mergeRows(S.tarea,parseC(rows,PRODT),kT);else if(kind=='h')S.hoy=mergeRows(S.hoy,rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),fecha:toISO(pick(r,['fecha','dia'])),prod:String(pick(r,['producto','indicador'])).trim(),valor:num(pick(r,['valor','cantidad','meta'])),ta:nv(pick(r,['tarea de ayer','tarea ayer'])),ra:nv(pick(r,['real de ayer','real ayer']))})).filter(x=>x.prod&&x.fecha),kH);else S.cumpl=mergeRows(S.cumpl,parseC(rows),kC);
   S.msg=(kind=='v'?'Puntos':kind=='p'?'Personal':kind=='t'?'Tarea diaria':kind=='h'?'Tarea de hoy':'Cumplimientos')+' cargado: '+rows.length+' filas'+warn(kind,rows)+(kind=='p'||kind=='v'?'':' · se suma al historial. Toca Publicar accesos para guardarlo');save();render();
@@ -201,7 +202,11 @@ async function tpl(k){
  h:['Tarea_de_hoy',['Cédula','Nombre','Fecha','Producto','Valor a realizar','Tarea de ayer','Real de ayer'],[['1001','Nombre del asesor','2026-10-21','Chance',120,100,95],['1001','Nombre del asesor','2026-10-21','Baloto',60,50,55]]],
  t:['Tarea_diaria',['Cédula','Nombre','Fecha',...PRODT.flatMap(p=>[p+' Meta',p+' Real'])],[['1001','Nombre del asesor','2026-10-21',...PRODT.flatMap((p,i)=>i<2?[100,i?80:112]:['',''])]]],
  c:['Cumplimientos',['Punto','Fecha',...PRODS.flatMap(p=>[p+' Meta',p+' Real'])],[['Nogales Centro','2026-10-21',...PRODS.flatMap((p,i)=>i<2?[100,i?80:112]:['',''])]]]}[k];
- let note='';{const R=dyn(k);if(R.length){T[2]=R;note='Plantilla descargada con tu última información. Cambia la fecha y los valores.'}}
+ let note='';const sv=(S.tpl||{})[k];
+ if(sv&&sv.rows.length){T[1]=sv.hd;T[2]=sv.rows.map(r=>r.slice());
+  const fi=sv.hd.findIndex(c=>norm(c)=='fecha');
+  if(fi>=0){const ds=T[2].map(r=>toISO(r[fi])).filter(Boolean).sort();const nd=nextD(ds[ds.length-1]||'');T[2].forEach(r=>{r[fi]=nd})}
+  note='Plantilla descargada tal como la cargaste la última vez. Cambia solo los valores.'}
  const ws=XLSX.utils.aoa_to_sheet([T[1],...T[2]]);ws['!cols']=T[1].map(()=>({wch:20}));
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,T[0]);if(k=='h')XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Productos válidos'],...PRODT.map(x=>[x])]),'Productos');
  try{const d=await claude.use('downloads');if(!d){S.msg='La descarga no está disponible aquí.';return render()}
