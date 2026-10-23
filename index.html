@@ -24,6 +24,7 @@ window.addEventListener('hashchange',()=>location.reload());
 function adminForm(){hdr();document.getElementById('app').innerHTML='<div class="card"><b>Acceso del administrador</b><input type="text" id="ae" placeholder="Correo"><input type="text" id="ap" placeholder="Contraseña" style="-webkit-text-security:disc"><button onclick="adminIn()">Entrar</button><p class="mu" id="am"></p></div>'}
 function adminIn(){fauth.signInWithEmailAndPassword(document.getElementById('ae').value.trim(),document.getElementById('ap').value).then(()=>location.reload()).catch(()=>{document.getElementById('am').textContent='Correo o contraseña incorrectos.'})}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--tx:#14213d;--mu:#667085;--ac:#d62828;--bd:#e4e7ec;--ok:#1a9a53;--md:#d99100;--bad:#d62828;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -97,10 +98,10 @@ function render(){hdr();
  if(S.mode===null){document.getElementById('app').innerHTML='<p class="mu">Cargando…</p>';return}
  if(S.mode=='asesor'||location.hash=='#asesor')return renderAs();
  const pts=build(),A=document.getElementById('app');
- let h=`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos CH millonario y CH millonario 1 a 5, Tripletazo, Baloto, Miloto, Lotería virtual, Kash, Superchance y Raspa y listo. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
+ let h=(S.img?imgHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos CH millonario y CH millonario 1 a 5, Tripletazo, Baloto, Miloto, Lotería virtual, Kash, Superchance y Raspa y listo. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
  <div class="row"><label class="b">📍 Puntos de venta<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'v')"></label>
  <label class="b">👥 Personal<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'p')"></label>
- <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
+ <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
  <button class="s" onclick="demo()">Ver ejemplo</button><button class="s" onclick="clearAll()">Borrar</button></div>
  <div class="row" style="margin-top:8px"><button onclick="pub()">🔑 Publicar accesos de asesores</button><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
  <p class="mu">${S.msg||`Puntos: ${S.puntos.length} · Personal: ${S.personal.length} · Cumplimiento punto: ${S.cumpl.length} · Tarea diaria: ${S.tarea.length} · Tarea de hoy: ${S.hoy.length}`}</p></div>`;
@@ -131,7 +132,7 @@ function demo(){
 }
 
 let DB=null,USR=null,ADV=null,tries=0;
-const PRODS=['Chance','Lotería virtual','Lotería física','Baloto','Astro millonario','Kash','Raspa y gana','Recargas','Betplay'];
+const PRODS=['Chance','Lotería virtual','Lotería física','Baloto','Astro millonario','Kash','Raspa y gana','Recargas','Betplay','Giros pagados','Giros enviados','Recaudos','Corresponsalía'];
 const mergeRows=(a,b,kf)=>{const m=new Map();a.forEach(r=>m.set(kf(r),r));b.forEach(r=>m.set(kf(r),r));return[...m.values()]};
 const kC=r=>[norm(r.punto),r.fecha||r.periodo,r.ind].join('|');
 const kT=r=>[r.id||norm(r.nombre),r.fecha||r.periodo,r.ind].join('|');
@@ -282,6 +283,38 @@ async function myPhoto(f){if(!f||!ADV)return;
   try{await DB.doc('fotos/'+ADV.key).set({cedula:ADV.id,foto:d});S.msg='Foto guardada.'}
   catch(e){S.msg='Tu foto se ve aquí, pero no se pudo guardar. Intenta de nuevo más tarde.'}
   render()})}
+const canon=n=>{n=String(n).trim();const f=PRODS.find(p=>norm(p)==norm(n));return f||(n?n.charAt(0).toUpperCase()+n.slice(1).toLowerCase():'')};
+function parseImg(t){const L=t.split(/\n+/).map(x=>x.trim()).filter(Boolean);let punto='';const rows=[];
+ L.forEach(l=>{const m=l.match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*%\s*$/);
+  if(!m){if(!punto&&/\s-\s/.test(l))punto=l.split(/\s-\s/).pop().trim();return}
+  const nm=[];for(const k of l.slice(0,m.index).trim().split(/\s+/)){if(/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(k)||(k=='Y'&&nm.length))nm.push(k);else if(nm.length)break}
+  if(nm.length)rows.push({p:canon(nm.join(' ')),pct:parseFloat(m[1].replace(',','.'))})});
+ return{punto,rows}}
+async function imgUp(files){files=[...(files||[])];if(!files.length)return;
+ S.msg='Leyendo imágenes… la primera vez puede tardar un minuto.';render();
+ const items=[];let bad=0;
+ try{const w=await Tesseract.createWorker('eng');await w.setParameters({tessedit_pageseg_mode:'6'});
+  for(let i=0;i<files.length;i++){S.msg='Leyendo imagen '+(i+1)+' de '+files.length+'…';render();
+   try{const r=await w.recognize(files[i]);const P=parseImg(r.data.text||'');
+    if(P.rows.length){const pm=S.puntos.find(p=>norm(p.name)==norm(P.punto));items.push({punto:pm?pm.name:P.punto,rows:P.rows,open:false})}else bad++}catch(e){bad++}}
+  await w.terminate()}
+ catch(e){S.msg='No pude leer las imágenes ('+((e&&e.message)||e)+').';return render()}
+ if(!items.length){S.msg='No pude leer productos con porcentaje en esas imágenes. Prueba con capturas más nítidas.';return render()}
+ S.img={fecha:tod(),items};S.msg=items.length+' imagen(es) leída(s)'+(bad?'; '+bad+' no se pudieron leer':'')+'. Revisa y guarda.';render()}
+function imgHtml(){const I=S.img,ok=p=>S.puntos.some(x=>norm(x.name)==norm(p));
+ return `<div class="card"><b>📷 Esto entendí de las imágenes</b><p class="mu">Revisa y corrige antes de guardar. Cada punto se guarda con meta 100 y real = porcentaje.</p>
+ <datalist id="lp">${S.puntos.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
+ <input type="text" value="${esc(I.fecha)}" placeholder="Fecha de todas (AAAA-MM-DD)" oninput="S.img.fecha=this.value">
+ ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.img.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.punto||'(sin punto)')}</b> · ${it.rows.length} productos${ok(it.punto)?'':' ⚠ no coincide con tus puntos'}</summary>
+ <input type="text" list="lp" value="${esc(it.punto)}" placeholder="Punto de venta" oninput="S.img.items[${n}].punto=this.value">
+ ${it.rows.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.img.items[${n}].rows[${i}].p=this.value"><input type="text" inputmode="decimal" value="${r.pct}" style="width:90px" oninput="S.img.items[${n}].rows[${i}].pct=this.value"><button class="s" onclick="S.img.items[${n}].rows.splice(${i},1);S.img.items[${n}].open=true;render()">✖</button></div>`).join('')}
+ <button class="s" onclick="S.img.items.splice(${n},1);render()">Quitar este punto</button></details>`).join('')}
+ <div class="row" style="margin-top:8px"><button onclick="imgSave()">✅ Guardar todo (${I.items.length})</button><button class="s" onclick="S.img=null;render()">Cancelar</button></div></div>`}
+function imgSave(){const I=S.img,f=toISO(I.fecha);if(!f){S.msg='Escribe una fecha válida (AAAA-MM-DD).';return render()}
+ if(I.items.some(it=>!String(it.punto).trim())){S.msg='Hay puntos sin nombre. Ábrelos y escribe el punto.';return render()}
+ let n=0;const rows=[];I.items.forEach(it=>{const pn=(S.puntos.find(p=>norm(p.name)==norm(it.punto))||{name:String(it.punto).trim()}).name;
+  it.rows.forEach(r=>{const ind=canon(r.p),res=num(r.pct);if(ind){rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res,periodo:f.slice(0,7),fecha:f});n++}})});
+ S.cumpl=mergeRows(S.cumpl,rows,kC);const np=I.items.length;S.img=null;S.msg='Guardado: '+np+' puntos, '+n+' productos ('+f+'). Toca Publicar accesos para guardarlo.';save();render()}
 function warn(kind,rows){if(!rows.length)return ' ⚠ No encontré filas de datos. Revisa que los títulos estén en la primera fila.';
  if(kind=='h'){const ok=rows.filter(r=>toISO(pick(r,['fecha','dia']))&&String(pick(r,['producto','indicador'])).trim()).length;if(ok<rows.length)return ' ⚠ Solo '+ok+' filas tienen Fecha y Producto reconocidos. Revisa esas dos columnas.'}return ''}
 function hoyNav(n){const c=new Date((HD||tod())+'T12:00:00');c.setDate(c.getDate()+n);const s=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0')+'-'+String(c.getDate()).padStart(2,'0');HD=s>=tod()?'':s;render()}
