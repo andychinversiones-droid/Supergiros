@@ -69,7 +69,7 @@ function read(file,kind){
   const hd=(aoa[hi]||[]).map(c=>String(c).trim());
   const rows=aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')).map(r=>{const o={};hd.forEach((k,i)=>{if(k)o[k]=r[i]??''});return o});
   if(kind=='v')S.puntos=rows.map(r=>({name:String(pick(r,['punto','nombre','sucursal','oficina'])).trim(),ciudad:pick(r,['ciudad','municipio','direccion']),resp:pick(r,['responsable','coordinador','encargado','lider'])})).filter(x=>x.name);else if(kind=='p')S.personal=rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),cargo:pick(r,['cargo']),clave:String(pick(r,['clave','pin'])).trim(),punto:String(pick(r,['punto','sucursal','oficina'])).trim()||'Sin punto'}));
-  else if(kind=='t')S.tarea=mergeLocked(S.tarea,parseC(rows,PRODT),kT);else if(kind=='h')S.hoy=mergeLocked(S.hoy,rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),fecha:toISO(pick(r,['fecha','dia'])),prod:String(pick(r,['producto','indicador'])).trim(),valor:num(pick(r,['valor','cantidad','meta'])),ta:nv(pick(r,['tarea de ayer','tarea ayer'])),ra:nv(pick(r,['real de ayer','real ayer']))})).filter(x=>x.prod&&x.fecha),kH);else S.cumpl=mergeLocked(S.cumpl,parseC(rows),kC);
+  else if(kind=='t')S.tarea=mergeLocked(S.tarea,parseC(rows,PRODT),kT);else if(kind=='h')S.hoy=mergeLocked(S.hoy,rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),fecha:toISO(pick(r,['fecha','dia'])),prod:cT(String(pick(r,['producto','indicador'])).trim()),valor:num(pick(r,['valor','cantidad','meta'])),ta:nv(pick(r,['tarea de ayer','tarea ayer'])),ra:nv(pick(r,['real de ayer','real ayer']))})).filter(x=>x.prod&&x.fecha),kH);else S.cumpl=mergeLocked(S.cumpl,parseC(rows),kC);
   S.msg=(kind=='v'?'Puntos':kind=='p'?'Personal':kind=='t'?'Tarea diaria':kind=='h'?'Tarea de hoy':'Cumplimientos')+' cargado: '+rows.length+' filas'+warn(kind,rows)+(kind=='p'||kind=='v'?'':' · se suma al historial. Toca Publicar accesos para guardarlo');save();render();if(DB&&LOADED){const m0=S.msg;pub().then(()=>{S.msg=m0+' · '+S.msg;render()})}
  }catch(err){S.msg='No pude leer el archivo ('+((err&&err.message)||err)+'). Usa Excel (.xlsx) o CSV.';render()}};
  fr.readAsArrayBuffer(file);
@@ -99,10 +99,10 @@ function render(){hdr();
  if(S.mode===null){document.getElementById('app').innerHTML='<p class="mu">Cargando…</p>';return}
  if(S.mode=='asesor'||location.hash=='#asesor')return renderAs();
  const pts=build(),A=document.getElementById('app');
- let h=(S.img?imgHtml():'')+(S.imgA?imgAHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos CH millonario y CH millonario 1 a 5, Tripletazo, Baloto, Miloto, Lotería virtual, Kash, Superchance y Raspa y listo. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
+ let h=(S.img?imgHtml():'')+(S.imgA?imgAHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos Lotería virtual, Tripletazo, CH millonario, Local ch millo, Superchance, Baloto, Miloto, Kash, Raspa y listo y Quinta. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
  <div class="row"><label class="b">📍 Puntos de venta<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'v')"></label>
  <label class="b">👥 Personal<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'p')"></label>
- <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">📷 Imágenes cumplimiento asesores<input type="file" accept="image/*" multiple onchange="imgAUp(this.files)"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
+ <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">📷 Imágenes cumplimiento asesores<input type="file" accept="image/*" multiple onchange="imgAUp(this.files,'real')"></label><label class="b">📷 Imagen tarea de hoy<input type="file" accept="image/*" multiple onchange="imgAUp(this.files,'tarea')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
  <button class="s" onclick="delDia()">🗑 Borrar un día cargado hoy</button></div>
  <div class="row" style="margin-top:8px"><button onclick="pub()">🔑 Publicar accesos de asesores</button><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
  <div class="row" style="margin-top:8px"><label class="b">📷 Fotos de asesores<input type="file" accept="image/*" multiple onchange="fotos(this.files)"></label></div><p class="mu">Fotos: nombra cada archivo con la cédula del asesor (ej. 1001.jpg). Puedes subir varias a la vez.</p>
@@ -141,7 +141,7 @@ const kT=r=>[r.id||norm(r.nombre),r.fecha||r.periodo,r.ind].join('|');
 const kH=r=>[r.id||norm(r.nombre),r.fecha,norm(r.prod)].join('|');
 const capD=(arr,n,i)=>{const s=new Set([...new Set(arr.map(x=>x[i]))].sort().slice(-n));return arr.filter(x=>s.has(x[i]))};
 const nv=v=>String(v??'')===''?null:num(v);
-const PRODT=['CH millonario','CH millonario 1 a 5','Tripletazo','Baloto','Miloto','Lotería virtual','Kash','Superchance','Raspa y listo'];
+const PRODT=['Lotería virtual','Tripletazo','CH millonario','Local ch millo','Superchance','Baloto','Miloto','Kash','Raspa y listo','Quinta'];
 function parseC(rows,PL){PL=PL||PRODS;const out=[];
  rows.forEach(r=>{
   const punto=String(pick(r,['punto','sucursal','oficina'])).trim(),id=String(pick(r,['cedula','documento','id'])).trim(),nombre=String(pick(r,['nombre','asesor','empleado'])).trim(),fecha=toISO(pick(r,['fecha','dia'])),periodo=pick(r,['periodo','mes'])||fecha.slice(0,7);
@@ -242,7 +242,7 @@ async function loadDB(){
   pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp,ord:x.ord??1e9});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],po:r[4]?1:0,cargado:r[5]||'',periodo:r[0].slice(0,7),fecha:r[0]}))});
   S.cumpl=mergeRows(cum.map(r=>({...r,ind:canon(r.ind)})),S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH);
   if(!S.personal.length)S.personal=per.sort((a,b)=>a.ord-b.ord);if(!S.puntos.length)S.puntos=pts.filter(x=>x.name).sort((a,b)=>a.ord-b.ord);
-  LOADED=true;stampAll();NEEDFIX=cleanBad();S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
+  LOADED=true;stampAll();NEEDFIX=cleanBad();{const mg=migrateT();NEEDFIX+=mg.ren+mg.del}S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
  }catch(e){S.msg='No pude cargar el historial guardado.'}
 }
 async function pub(){
@@ -281,15 +281,16 @@ async function login(){
 }
 let HD='';
 const tod=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-async function myPhoto(f){if(!f||!ADV)return;
+async function myPhoto(f){if(!f||!ADV||!isOwn())return;
  rs(f,160,true,async d=>{if(!d){S.msg='No pude leer esa imagen.';return render()}
-  ADV.foto=d;
-  try{await DB.doc('fotos/'+ADV.key).set({cedula:ADV.id,foto:d});S.msg='Foto guardada.'}
-  catch(e){S.msg='Tu foto se ve aquí, pero no se pudo guardar. Intenta de nuevo más tarde.'}
-  render()})}
+  ADV.foto=d;S.fotos[did(ADV.id)]=d;save();S.msg='Foto guardada.';render();
+  if(DB&&LOADED){await pub();S.msg='Foto guardada y publicada.';render()}})}
 const KNOWN=[...new Set([...PRODS,...PRODT])];
 const lev=(a,b)=>{const m=[];for(let i=0;i<=a.length;i++)m[i]=[i];for(let j=1;j<=b.length;j++)m[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]==b[j-1]?0:1));return m[a.length][b.length]};
-const ALIAS={'local chance millonario':'CH millonario','chance millonario':'CH millonario','ch millonario':'CH millonario'};
+const ALIAS={'local chance millonario':'Local ch millo','local ch millonario':'Local ch millo','local ch millo':'Local ch millo','chance millonario':'CH millonario','ch millo':'CH millonario','chmillo':'CH millonario','localchmillo':'Local ch millo','ras y list':'Raspa y listo','ras y listo':'Raspa y listo','rasylist':'Raspa y listo','rasylisto':'Raspa y listo','raspa y list':'Raspa y listo','l virtual':'Lotería virtual','lvirtual':'Lotería virtual'};
+const canonT=n=>{n=String(n).trim();if(!n)return '';const k=norm(n),a=ALIAS[k]||ALIAS[k.replace(/\s/g,'')];if(a&&PRODT.includes(a))return a;let f=PRODT.find(p=>norm(p)==k);if(f)return f;
+ if(k.length>5){f=PRODT.map(p=>[p,lev(k,norm(p))]).filter(x=>x[1]<=2&&norm(x[0]).length>5).sort((a,b)=>a[1]-b[1])[0];if(f)return f[0]}return ''};
+const cT=n=>canonT(n)||String(n).trim();
 const canon=n=>{n=String(n).trim();if(!n)return '';const k=norm(n);if(ALIAS[k])return ALIAS[k];let f=KNOWN.find(p=>norm(p)==k);if(f)return f;
  if(k.length>5){f=KNOWN.map(p=>[p,lev(k,norm(p))]).filter(x=>x[1]<=2&&norm(x[0]).length>5).sort((a,b)=>a[1]-b[1])[0];if(f)return f[0]}
  return n.charAt(0).toUpperCase()+n.slice(1).toLowerCase()};
@@ -303,6 +304,9 @@ const pL=P=>lastInfo((P.days||[]).map(d=>[d.f,d.i,d.m,d.r,d.po])),pAvg=P=>{const
 const mergeLocked=(old,add,kf)=>{const T=tod(),m=new Map();old.forEach(r=>m.set(kf(r),r));LOCKED=0;
  add.forEach(r=>{const k=kf(r),e=m.get(k);if(e&&e.cargado&&e.cargado!=T){LOCKED++;return}m.set(k,{...r,cargado:T})});return[...m.values()]};
 function stampAll(){const T=tod();[S.cumpl,S.tarea,S.hoy].forEach(a=>a.forEach(r=>{if(!r.cargado)r.cargado=T}))}
+function migrateT(){const T=tod();let ren=0,del=0,keep=0;
+ const fix=(arr,key)=>arr.filter(r=>{const c=canonT(r[key]);if(c){if(c!==r[key]){r[key]=c;ren++}return true}if(r.cargado==T){del++;return false}keep++;return true});
+ S.tarea=fix(S.tarea,'ind');S.hoy=fix(S.hoy,'prod');S.tarea=mergeRows([],S.tarea,kT);S.hoy=mergeRows([],S.hoy,kH);return{ren,del,keep}}
 function cleanBad(){const b=S.cumpl.length;S.cumpl=S.cumpl.filter(r=>!(r.po&&r.fecha&&r.cargado&&r.fecha>=r.cargado));return b-S.cumpl.length}
 function delDia(){const T=tod(),f=toISO(prompt('¿Qué fecha quieres borrar? Solo se borra lo que cargaste hoy. Escribe AAAA-MM-DD'));
  if(!f)return;const n=[S.cumpl,S.tarea,S.hoy].reduce((s,a)=>s+a.filter(r=>r.fecha==f&&r.cargado==T).length,0);
@@ -362,61 +366,84 @@ async function imgSave(){const I=S.img,bf=toISO(I.fecha);
 function wordsFrom(d){if(d.words&&d.words.length)return d.words.map(w=>({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1}));
  return String(d.tsv||'').split('\n').map(l=>l.split('\t')).filter(c=>c[0]=='5'&&(c[11]||'').trim()).map(c=>({t:c[11].trim(),x0:+c[6],y0:+c[7],x1:+c[6]+ +c[8],y1:+c[7]+ +c[9]}))}
 function parsePivot(W){
- if(!W.length)return{items:[]};
+ const cl=t=>String(t).replace(/^[^\dA-Za-zÁÉÍÓÚÑáéíóúñ]+|[^\dA-Za-zÁÉÍÓÚÑáéíóúñ]+$/g,'');
+ W=W.map(w=>({...w,t:cl(w.t)})).filter(w=>w.t);if(!W.length)return{items:[]};
  const H=W.map(w=>w.y1-w.y0).sort((a,b)=>a-b)[Math.floor(W.length/2)]||14;
  const isNum=t=>/^\d{1,3}([.,]\d{3})+$|^\d{1,6}$/.test(t),ced=w=>(!/[.,]/.test(w.t)&&/^\D?\d{7,12}$/.test(w.t))?w.t.replace(/\D/g,''):'';
  const ws=[...W].sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),rows=[];
  ws.forEach(w=>{const yc=(w.y0+w.y1)/2,r=rows[rows.length-1];if(r&&Math.abs(yc-r.yc)<H*0.6){r.w.push(w);r.yc=(r.yc*(r.w.length-1)+yc)/r.w.length}else rows.push({yc,w:[w]})});
  rows.forEach(r=>r.w.sort((a,b)=>a.x0-b.x0));
  const di=rows.findIndex(r=>r.w.some(ced));if(di<0)return{items:[]};
- const hr=rows.slice(0,di).reverse().find(r=>r.w.some(w=>/ENDEDOR/i.test(w.t)));if(!hr)return{items:[]};
- const vx=hr.w.find(w=>/ENDEDOR/i.test(w.t)).x1,hw=hr.w.filter(w=>w.x0>vx&&/[A-Za-zÁÉÍÓÚÑ]{3,}/.test(w.t)),cols=[];
- hw.forEach(w=>{const t=w.t.replace(/^[^A-Za-zÁÉÍÓÚÑ]+/,''),c=cols[cols.length-1];if(c&&w.x0-c.x1<Math.max(18,1.4*H)){c.t+=' '+t;c.x1=w.x1}else cols.push({t,x0:w.x0,x1:w.x1})});
+ const NM=/ENDEDOR|ASESOR/i,hr=rows.slice(0,di).reverse().find(r=>r.w.some(w=>NM.test(w.t)));if(!hr)return{items:[]};
+ const nh=hr.w.find(w=>NM.test(w.t)),anchor=Math.max(...hr.w.filter(w=>/ENDEDOR|ASESOR|CEDULA|CÉDULA/i.test(w.t)).map(w=>w.x1));
+ const hw=hr.w.filter(w=>w.x0>anchor&&/[A-Za-zÁÉÍÓÚÑ]/.test(w.t)),nsp=s=>norm(s).replace(/\s/g,'');
+ const VOC=new Set([...PRODT.map(norm),...PRODT.map(nsp),...Object.keys(ALIAS),...Object.keys(ALIAS).map(nsp)]),cols=[];let i=0,fb=false;
+ while(i<hw.length){let hit=0;for(let L=Math.min(4,hw.length-i);L>=1&&!hit;L--){const ph=hw.slice(i,i+L).map(w=>w.t).join(' ');if(VOC.has(norm(ph))||VOC.has(nsp(ph)))hit=L}
+  if(hit){const ph=hw.slice(i,i+hit);cols.push({t:ph.map(w=>w.t).join(' '),x0:ph[0].x0,x1:ph[hit-1].x1});i+=hit;fb=false}
+  else{const w=hw[i],c=cols[cols.length-1];if(c&&fb&&w.x0-c.x1<Math.max(18,1.4*H)){c.t+=' '+w.t;c.x1=w.x1}else{cols.push({t:w.t,x0:w.x0,x1:w.x1});fb=true}i++}}
  if(!cols.length)return{items:[]};
+ const nhi=Math.min(1e9,...hr.w.filter(w=>w.x0>nh.x1+2&&/[A-Za-zÁÉÍÓÚÑ]{3,}/.test(w.t)).map(w=>w.x0));
  let ix=1e9;rows.slice(di).forEach(r=>{const k=r.w.findIndex(ced);if(k>0&&/^\D?\d$/.test(r.w[k-1].t))ix=Math.min(ix,r.w[k-1].x0)});
  const x0=cols[0].x0-5,items=[];
  rows.slice(di).forEach(r=>{const ci=r.w.findIndex(ced);if(ci<0)return;
-  const after=r.w.slice(ci+1),nombre=after.filter(w=>w.x0<x0&&/[A-Za-zÁÉÍÓÚÑ]{2,}/.test(w.t)).map(w=>w.t).join(' ').replace(/\s+/g,' ').trim(),vals=[];
-  after.filter(w=>(w.x0+w.x1)/2>=x0&&isNum(w.t)).forEach(w=>{const c=(w.x0+w.x1)/2;let j=0;cols.forEach((k,i)=>{if(c>=k.x0-5)j=i});vals.push({p:canon(cols[j].t),v:parseInt(w.t.replace(/[.,]/g,''),10)})});
+  const nombre=r.w.filter(w=>w.x0>=nh.x0-H&&w.x0<nhi-2&&/[A-Za-zÁÉÍÓÚÑ]{2,}/.test(w.t)&&!ced(w)).map(w=>w.t).join(' ').replace(/\s+/g,' ').trim(),vals=[];
+  r.w.filter(w=>(w.x0+w.x1)/2>=x0&&isNum(w.t)).forEach(w=>{const c=(w.x0+w.x1)/2;let j=0;cols.forEach((k,i)=>{if(c>=k.x0-5)j=i});vals.push({p:(canonT(cols[j].t)||canon(cols[j].t)),v:parseInt(w.t.replace(/[.,]/g,''),10)})});
   let cd=ced(r.w[ci]);if(ix<1e9&&r.w[ci].x0<=ix+3&&cd.length>7)cd=cd.slice(1);if(vals.length)items.push({ced:cd,nombre,vals,open:false})});
  return{items,cols:cols.map(c=>c.t)}}
+async function prepTable(file){const bmp=await createImageBitmap(file),sc=bmp.width<1300?2:1,c=document.createElement('canvas');c.width=bmp.width*sc;c.height=bmp.height*sc;
+ const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(bmp,0,0,c.width,c.height);
+ const id=x.getImageData(0,0,c.width,c.height),d=id.data,W=c.width,H=c.height,g=new Uint8Array(W*H);let sum=0;
+ for(let i=0;i<W*H;i++){g[i]=(d[4*i]*0.3+d[4*i+1]*0.59+d[4*i+2]*0.11)|0;sum+=g[i]}
+ if(sum/(W*H)<110)for(let i=0;i<g.length;i++)g[i]=255-g[i];
+ let dk=new Uint8Array(W*H);for(let i=0;i<g.length;i++)dk[i]=g[i]<150?1:0;
+ const clearH=(m,min)=>{const o=m.slice();for(let y=0;y<H;y++){let x0=0;while(x0<W){if(m[y*W+x0]){let s=x0;while(x0<W&&m[y*W+x0])x0++;if(x0-s>=min)for(let k=s;k<x0;k++)o[y*W+k]=0}else x0++}}return o};
+ const clearV=(m,min)=>{const o=m.slice();for(let x0=0;x0<W;x0++){let y=0;while(y<H){if(m[y*W+x0]){let s=y;while(y<H&&m[y*W+x0])y++;if(y-s>=min)for(let k=s;k<y;k++)o[k*W+x0]=0}else y++}}return o};
+ dk=clearV(clearH(dk,30*sc),15*sc);
+ for(let i=0;i<W*H;i++){const v=dk[i]?0:255;d[4*i]=d[4*i+1]=d[4*i+2]=v;d[4*i+3]=255}
+ x.putImageData(id,0,0);return c}
+async function ocrTable(w,file){let r=await w.recognize(file),P=parsePivot(wordsFrom(r.data));
+ if(P.items.length>=3)return P;
+ try{const c=await prepTable(file);r=await w.recognize(c);const Q=parsePivot(wordsFrom(r.data));if(Q.items.length>P.items.length)return Q}catch(e){}
+ return P}
 function matchCed(raw){const d=String(raw).replace(/\D/g,''),c=[...new Set([d,d.slice(-10),d.slice(1),d.slice(2)])].filter(x=>x.length>=6);
  for(const k of c){const p=S.personal.find(x=>String(x.id).replace(/\D/g,'')==k);if(p)return{id:p.id,nombre:p.nombre,ok:true}}
  return{id:d.length>10?d.slice(-10):d,nombre:'',ok:false}}
-async function imgAUp(files){files=[...(files||[])];if(!files.length)return;
+async function imgAUp(files,modo){modo=modo||'real';files=[...(files||[])];if(!files.length)return;
  S.msg='Leyendo imágenes… la primera vez puede tardar un minuto.';render();
  const g=new Map();let bad=0,dup=0;
  try{const w=await Tesseract.createWorker('eng');await w.setParameters({tessedit_pageseg_mode:'6'});
   for(let i=0;i<files.length;i++){S.msg='Leyendo imagen '+(i+1)+' de '+files.length+'…';render();
-   try{const r=await w.recognize(files[i]),P=parsePivot(wordsFrom(r.data));if(!P.items.length){bad++;continue}
+   try{const P=await ocrTable(w,files[i]);if(!P.items.length){bad++;continue}
     P.items.forEach(it=>{const m=matchCed(it.ced),k=m.ok?m.id:it.ced;let x=g.get(k);if(x)dup++;else{x={ced:m.ok?m.id:it.ced,nombre:m.ok?m.nombre:it.nombre,ok:m.ok,vals:[],open:false};g.set(k,x)}
      it.vals.forEach(v=>{const j=x.vals.findIndex(y=>norm(y.p)==norm(v.p));if(j>=0)x.vals[j]=v;else x.vals.push(v)})})}catch(e){bad++}}
   await w.terminate()}
  catch(e){S.msg='No pude leer las imágenes ('+((e&&e.message)||e)+').';return render()}
  if(!g.size){S.msg='No pude leer asesores con valores en esas imágenes. Prueba con capturas más nítidas.';return render()}
- S.imgA={fecha:yday(),items:[...g.values()]};const sin=S.imgA.items.filter(x=>!x.ok).length;
+ S.imgA={modo,fecha:modo=='tarea'?tod():yday(),items:[...g.values()]};const sin=S.imgA.items.filter(x=>!x.ok).length;
  S.msg=g.size+' asesor(es) leído(s)'+(dup?'; '+dup+' repetido(s) se unieron':'')+(sin?'; ⚠ '+sin+' con cédula que no está en Personal':'')+(bad?'; '+bad+' imagen(es) no se pudieron leer':'')+'. Revisa la fecha y guarda.';render()}
-function imgAHtml(){const I=S.imgA;
- return `<div class="card"><b>📷 Cumplimiento de asesores (valores)</b><p class="mu">Revisa y corrige antes de guardar. Los valores se guardan en la fecha que indiques.</p>
- <p class="mu" style="margin:6px 0 0">Fecha del cumplimiento (normalmente el día anterior):</p>
+function imgAHtml(){const I=S.imgA,T=I.modo=='tarea';
+ return `<div class="card"><b>${T?'📷 Tarea de hoy por asesor':'📷 Cumplimiento de asesores (valores)'}</b><p class="mu">Revisa y corrige antes de guardar. ${T?'Los valores son lo que cada asesor debe hacer en esa fecha.':'Los valores se guardan en la fecha que indiques.'}</p>
+ <p class="mu" style="margin:6px 0 0">${T?'Fecha de la tarea (normalmente hoy):':'Fecha del cumplimiento (normalmente el día anterior):'}</p>
  <input type="date" value="${esc(I.fecha)}" oninput="S.imgA.fecha=this.value">
- ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.imgA.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.nombre||'(sin nombre)')}</b> · ${esc(it.ced)} · ${it.vals.length} productos${it.ok?'':' ⚠ cédula no está en Personal'}</summary>
+ ${I.items.map((it,n)=>{const unk=it.vals.filter(v=>!PRODT.includes(v.p)).length;return `<details ${it.open?'open':''} ontoggle="S.imgA.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.nombre||'(sin nombre)')}</b> · ${esc(it.ced)} · ${it.vals.length} productos${it.ok?'':' ⚠ cédula no está en Personal'}${unk?' ⚠ '+unk+' producto(s) fuera de la lista':''}</summary>
  <input type="text" inputmode="numeric" value="${esc(it.ced)}" placeholder="Cédula" oninput="S.imgA.items[${n}].ced=this.value">
  <input type="text" value="${esc(it.nombre)}" placeholder="Nombre" oninput="S.imgA.items[${n}].nombre=this.value">
  ${it.vals.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.imgA.items[${n}].vals[${i}].p=this.value"><input type="text" inputmode="numeric" value="${r.v}" style="width:110px" oninput="S.imgA.items[${n}].vals[${i}].v=this.value"><button class="s" onclick="S.imgA.items[${n}].vals.splice(${i},1);S.imgA.items[${n}].open=true;render()">✖</button></div>`).join('')}
- <button class="s" onclick="S.imgA.items.splice(${n},1);render()">Quitar este asesor</button></details>`).join('')}
+ <button class="s" onclick="S.imgA.items.splice(${n},1);render()">Quitar este asesor</button></details>`}).join('')}
  <div class="row" style="margin-top:8px"><button onclick="imgASave()">✅ Guardar todo (${I.items.length})</button><button class="s" onclick="S.imgA=null;render()">Cancelar</button></div></div>`}
-async function imgASave(){const I=S.imgA,f=toISO(I.fecha);
- if(!f||f>=tod()){S.msg='La fecha debe ser anterior a hoy: es el cumplimiento del día anterior.';return render()}
+async function imgASave(){const I=S.imgA,f=toISO(I.fecha),T=I.modo=='tarea';
+ if(!f||(!T&&f>=tod())){S.msg='La fecha debe ser anterior a hoy: es el cumplimiento del día anterior.';return render()}
+ if(T&&f<tod()){S.msg='La fecha de la tarea debe ser hoy o una fecha futura.';return render()}
  const rows=[];let n=0,sin=0;
  I.items.forEach(it=>{const m=matchCed(it.ced),id=m.ok?m.id:String(it.ced).replace(/\D/g,''),nombre=m.ok?m.nombre:it.nombre;if(!m.ok)sin++;
-  it.vals.forEach(r=>{const ind=canon(r.p),v=parseInt(String(r.v).replace(/[^\d]/g,''),10);if(ind&&!isNaN(v)){rows.push({id,nombre,punto:'',ind,meta:0,res:v,periodo:f.slice(0,7),fecha:f});n++}})});
- S.tarea=mergeLocked(S.tarea,rows,kT);const lk=LOCKED,na=I.items.length;S.imgA=null;
- S.msg='Guardado: '+na+' asesores, '+n+' valores ('+f+')'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+(sin?'. ⚠ '+sin+' asesor(es) con cédula que no está en Personal: no se verán hasta que los agregues':'')+'.';save();render();
+  it.vals.forEach(r=>{const ind=cT(r.p),v=parseInt(String(r.v).replace(/[^\d]/g,''),10);if(ind&&!isNaN(v)){rows.push(T?{id,nombre,fecha:f,prod:ind,valor:v,ta:null,ra:null}:{id,nombre,punto:'',ind,meta:0,res:v,periodo:f.slice(0,7),fecha:f});n++}})});
+ if(T)S.hoy=mergeLocked(S.hoy,rows,kH);else S.tarea=mergeLocked(S.tarea,rows,kT);
+ const lk=LOCKED,na=I.items.length;S.imgA=null;
+ S.msg='Guardado: '+na+' asesores, '+n+(T?' tareas (':' valores (')+f+')'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+(sin?'. ⚠ '+sin+' asesor(es) con cédula que no está en Personal: no se verán hasta que los agregues':'')+'.';save();render();
  if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
 function ayerHtml(){const T=tod(),t=HD||T,ds=[...new Set((ADV.tdias||[]).map(x=>x[0]))].filter(d=>d<t).sort(),p=ds[ds.length-1];
  if(!p)return '<p class="mu">Aún no hay cumplimiento del día anterior cargado.</p>';
- const M=new Map(),add=(k,a,v)=>{const q=norm(canon(k));let e=M.get(q);if(!e){e={k:canon(k),task:null,real:null};M.set(q,e)}e[a]=(e[a]||0)+v};
+ const M=new Map(),add=(k,a,v)=>{const q=norm(canonT(k)||canon(k));let e=M.get(q);if(!e){e={k:canonT(k)||canon(k),task:null,real:null};M.set(q,e)}e[a]=(e[a]||0)+v};
  (ADV.tdias||[]).filter(x=>x[0]==p).forEach(x=>add(x[1],'real',x[3]));(ADV.hoy||[]).filter(x=>x[0]==p).forEach(x=>add(x[1],'task',x[2]));
  const L=[...M.values()].map(e=>({...e,pc:e.task>0&&e.real!=null?e.real/e.task*100:null})),pcs=L.filter(e=>e.pc!=null).map(e=>e.pc),pa=pcs.length?pcs.reduce((s,x)=>s+x,0)/pcs.length:null,f=v=>v==null?'—':v.toLocaleString();
  return `<p class="mu" style="margin:0 0 6px">${esc(fmtD(p))}</p><div class="tw"><table><tr><th>Producto</th><th>Tarea</th><th>Real</th><th>%</th></tr>${L.map(e=>`<tr><td>${esc(e.k)}</td><td>${f(e.task)}</td><td>${f(e.real)}</td><td>${e.pc==null?'—':pill(e.pc,1)}</td></tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día</b>${pill(pa,1)}</div>`}`}
@@ -435,7 +462,7 @@ function renderAs(){
  const LI=lastInfo(ADV.dias||[]);let ptd=pt,ppd=ADV.pp,lbl='';if(LI.f){ptd=LI.items;ppd=LI.avg;lbl=fmtD(LI.f)}
 
  const tb=a=>tb2(a);
- A.innerHTML=`<div class="card"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><div><b style="font-size:17px">${esc(ADV.nombre)}</b><div class="mu">${esc(ADV.cargo)} · ${esc(ADV.punto)}</div>${S.msg?`<div class="mu" style="margin-top:6px">${esc(S.msg)}</div>`:''}<div style="margin-top:10px"><button class="s" onclick="ADV=null;render()">Salir</button></div></div><div style="text-align:center;flex:none">${ADV.foto?`<img class="av" style="width:96px;height:96px" src="${ADV.foto}" alt="Mi foto">`:`<div class="av" style="width:96px;height:96px;display:grid;place-items:center;font-size:40px">👤</div>`}</div></div></div>
+ A.innerHTML=`<div class="card"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><div><b style="font-size:17px">${esc(ADV.nombre)}</b><div class="mu">${esc(ADV.cargo)} · ${esc(ADV.punto)}</div>${S.msg?`<div class="mu" style="margin-top:6px">${esc(S.msg)}</div>`:''}<div style="margin-top:10px"><button class="s" onclick="ADV=null;render()">Salir</button></div></div><div style="text-align:center;flex:none">${ADV.foto?`<img class="av" style="width:96px;height:96px" src="${ADV.foto}" alt="Mi foto">`:`<div class="av" style="width:96px;height:96px;display:grid;place-items:center;font-size:40px">👤</div>`}${isOwn()?`<label class="b" style="display:block;margin-top:6px;padding:6px 8px;font-size:12px">📷 ${ADV.foto?'Cambiar':'Subir'} foto<input type="file" accept="image/*" onchange="myPhoto(this.files[0])"></label>`:''}</div></div></div>
  <div class="card"><b>🎯 Tu tarea de hoy es</b>${hoyHtml()}</div>
  <div class="card"><b>✅ Tu cumplimiento de ayer</b>${ayerHtml()}</div>
  
@@ -450,6 +477,6 @@ S.mode=null;render();
  if(DB&&!isOwn()){try{const c=await DB.doc('config/app').get();if(c.exists&&c.data().logo)S.logo=c.data().logo}catch(e){}}
  if(!isOwn()&&location.hash=='#admin'){adminForm();return}
  S.mode=(isOwn()&&location.hash=='#admin')?'admin':'asesor';render();
- if(S.mode=='admin'&&DB){S.msg='Cargando historial guardado…';render();await loadDB();save();render();if(NEEDFIX){const m0='Se quitaron '+NEEDFIX+' datos con fecha igual o posterior al día en que se cargaron (cargas de prueba).';NEEDFIX=0;await pub();S.msg=m0+' · '+S.msg;render()}}
+ if(S.mode=='admin'&&DB){S.msg='Cargando historial guardado…';render();await loadDB();save();render();if(NEEDFIX){const m0='Se ajustaron '+NEEDFIX+' datos guardados (nombres de productos y datos de prueba).';NEEDFIX=0;await pub();S.msg=m0+' · '+S.msg;render()}}
 })();
 </script></body></html>
