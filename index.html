@@ -57,7 +57,7 @@ input[type=date]{width:100%;padding:10px;border-radius:8px;border:1px solid var(
 let S={hoy:[],tarea:[],fotos:{},logo:'',puntos:[],personal:[],cumpl:[],punto:null,q:'',msg:''};
 try{const x=localStorage.getItem('zns');if(x)Object.assign(S,JSON.parse(x),{punto:null,q:'',msg:''})}catch(e){}
 S.cumpl=[];S.tarea=[];S.hoy=[];S.tpl={};
-const save=()=>{try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
+const save=()=>{try{localStorage.setItem('zns',JSON.stringify({prodmap:S.prodmap,pmap:S.pmap,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({prodmap:S.prodmap,pmap:S.pmap,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const pick=(r,keys)=>{for(const k of Object.keys(r)){const n=norm(k);if(keys.some(x=>n.includes(x)))return r[k]}return ''};
 const num=v=>{const n=parseFloat(String(v).replace('%','').replace(',','.'));return isNaN(n)?0:n};
@@ -297,7 +297,7 @@ const ALIAS={'local chance millonario':'Local ch millo','local ch millonario':'L
 const canonT=n=>{n=String(n).trim();if(!n)return '';const k=norm(n),a=ALIAS[k]||ALIAS[k.replace(/\s/g,'')];if(a&&PRODT.includes(a))return a;let f=PRODT.find(p=>norm(p)==k);if(f)return f;
  if(k.length>5){f=PRODT.map(p=>[p,lev(k,norm(p))]).filter(x=>x[1]<=2&&norm(x[0]).length>5).sort((a,b)=>a[1]-b[1])[0];if(f)return f[0]}return ''};
 const cT=n=>canonT(n)||String(n).trim();
-const canon=n=>{n=String(n).trim();if(!n)return '';const k=norm(n);if(ALIAS[k])return ALIAS[k];let f=KNOWN.find(p=>norm(p)==k);if(f)return f;
+const canon=n=>{n=String(n).trim();if(!n)return '';const k=norm(n);if((S.prodmap||{})[k])return S.prodmap[k];if(ALIAS[k])return ALIAS[k];let f=KNOWN.find(p=>norm(p)==k);if(f)return f;
  if(k.length>5){f=KNOWN.map(p=>[p,lev(k,norm(p))]).filter(x=>x[1]<=2&&norm(x[0]).length>5).sort((a,b)=>a[1]-b[1])[0];if(f)return f[0]}
  return n.charAt(0).toUpperCase()+n.slice(1).toLowerCase()};
 const yday=()=>{const d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -336,15 +336,15 @@ function parsePanel(W){
  {const di=tr.w.findIndex(w=>w.t=='-'||/^[-–—]$/.test(w.t));const src=di>=0?tr.w.slice(di+1):[];punto=src.map(w=>w.t).join(' ').trim()}
  const labs=[],pcs=[];
  R.forEach(r=>{if(r===tr)return;let cur=null;
-  r.w.forEach(w=>{const m=w.t.match(PC);
+  r.w.forEach((w,ix)=>{const m=w.t.match(PC);
    if(m){pcs.push({v:parseFloat(m[1].replace(',','.')),raw:m[1],y:r.yc,x0:w.x0});cur=null}
-   else if(/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(w.t)||(w.t=='Y'&&cur)){if(cur&&w.x0-cur.x1<2.4*H){cur.t+=' '+w.t;cur.x1=w.x1}else{cur={t:w.t,x0:w.x0,x1:w.x1,y:r.yc};labs.push(cur)}}
+   else if(/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(w.t)||(cur&&/^[A-Za-z]$/.test(w.t)&&r.w[ix+1]&&/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(r.w[ix+1].t))){const tt=w.t.length==1?'Y':w.t;if(cur&&w.x0-cur.x1<5*H){cur.t+=' '+tt;cur.x1=w.x1}else{cur={t:tt,x0:w.x0,x1:w.x1,y:r.yc};labs.push(cur)}}
    else cur=null})});
  labs.sort((a,b)=>a.y-b.y);pcs.sort((a,b)=>a.y-b.y);
  const best=new Map();
  pcs.forEach(p=>{let L=null;labs.forEach(l=>{if(l.y<=p.y+0.6*H&&p.y-l.y<4.5*H&&(!L||l.y>L.y))L=l});
   if(L){const d=Math.abs(p.y-L.y),o=best.get(L);if(!o||d<o.d)best.set(L,{p,d})}});
- const rows=[...best.entries()].map(([l,o])=>({p:canon(l.t),pct:o.p.v,y:o.p.y,x0:o.p.x0,raw:o.p.raw})).sort((a,b)=>a.y-b.y);
+ const rows=[...best.entries()].map(([l,o])=>({lab:l.t,p:canon(l.t),pct:o.p.v,y:o.p.y,x0:o.p.x0,raw:o.p.raw})).sort((a,b)=>a.y-b.y);
  const used=new Set(best.keys()),diffs=[...best.entries()].map(([l,o])=>o.p.y-l.y).sort((a,b)=>a-b);
  return{rows,punto,H,miss:labs.filter(l=>!used.has(l)).map(l=>({t:l.t,y:l.y})),off:diffs.length?diffs[Math.floor(diffs.length/2)]:0,xcol:Math.min(1e9,...pcs.map(p=>p.x0))}}
 function barPx(img,Wd,y,xmax){let best=0;for(let dy=-2;dy<=2;dy++){const yy=Math.round(y)+dy;if(yy<0)continue;let s=-1,e=-1,gap=0;
@@ -393,9 +393,9 @@ async function imgUp(files){files=[...(files||[])];if(!files.length)return;
      if(Q.miss&&Q.miss.length&&Q.xcol<1e9){await w.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'0123456789.%'});
       for(const m of Q.miss){const ey=m.y+Q.off,sx=Math.max(0,Q.xcol-18),sy=Math.max(0,ey-1.6*Q.H),hh=Math.min(pp.canvas.height-sy,3.2*Q.H),cw=pp.canvas.width-sx,cc=document.createElement('canvas');cc.width=cw*3;cc.height=hh*3;
        cc.getContext('2d').drawImage(pp.canvas,sx,sy,cw,hh,0,0,cc.width,cc.height);const rr=await w.recognize(cc),mm=String(rr.data.text||'').replace(/\s/g,'').match(/(\d{1,3}[.,]\d{1,2})%?/);
-       if(mm)Q.rows.push({p:canon(m.t),pct:parseFloat(mm[1].replace(',','.')),y:ey,x0:sx,raw:mm[1]})}
+       if(mm)Q.rows.push({lab:m.t,p:canon(m.t),pct:parseFloat(mm[1].replace(',','.')),y:ey,x0:sx,raw:mm[1]})}
       Q.rows.sort((a,b)=>a.y-b.y);await w.setParameters({tessedit_char_whitelist:''})}
-     checkBars(Q.rows,pp.img,pp.Wd,pp.sc);P={rows:Q.rows.map(x=>({p:x.p,pct:x.pct,note:x.note||''})),punto:Q.punto}}}catch(e0){}
+     checkBars(Q.rows,pp.img,pp.Wd,pp.sc);P={rows:Q.rows.map(x=>({p:x.p,pct:x.pct,note:x.note||'',lab:x.lab||''})),punto:Q.punto}}}catch(e0){}
     if(!P.rows.length){await w.setParameters({tessedit_pageseg_mode:'6'});const r=await w.recognize(files[i]);txt=r.data.text||'';P=parseImg(txt)}
     if(!P.rows.length){fail.push(files[i].name||('imagen '+(i+1)));continue}
     let m=matchPunto(P.punto);
@@ -429,7 +429,7 @@ async function imgSave(){const I=S.img,bf=toISO(I.fecha);
  S.pmap=S.pmap||{};let n=0;const rows=[];
  I.items.forEach(it=>{const f=toISO(it.fecha)||bf,pn=C.find(c=>norm(c)==norm(it.punto))||String(it.punto).trim();
   if(it.det&&norm(it.det)!=norm(pn)&&C.some(c=>c==pn))S.pmap[norm(it.det)]=pn;
-  it.rows.forEach(r=>{const ind=canon(r.p);if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
+  it.rows.forEach(r=>{const ind=canon(r.p);if(r.lab&&norm(r.lab)!=norm(r.p)&&ind&&norm(canon(r.lab))!=norm(ind)){S.prodmap=S.prodmap||{};S.prodmap[norm(r.lab)]=ind}if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
  S.cumpl=mergeLocked(S.cumpl,rows,kC);const lk=LOCKED,np=I.items.length;S.img=null;
  S.msg='Cargado en pantalla: '+np+' puntos, '+n+' productos'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+'.';save();render();
  if(SAVE&&DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
