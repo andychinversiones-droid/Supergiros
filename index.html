@@ -103,7 +103,7 @@ function render(){hdr();
  <div class="row"><label class="b">📍 Puntos de venta<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'v')"></label>
  <label class="b">👥 Personal<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'p')"></label>
  <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
- <button class="s" onclick="delToday()">🗑 Borrar lo cargado hoy</button></div>
+ <button class="s" onclick="delDia()">🗑 Borrar un día cargado hoy</button></div>
  <div class="row" style="margin-top:8px"><button onclick="pub()">🔑 Publicar accesos de asesores</button><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
  <div class="row" style="margin-top:8px"><label class="b">📷 Fotos de asesores<input type="file" accept="image/*" multiple onchange="fotos(this.files)"></label></div><p class="mu">Fotos: nombra cada archivo con la cédula del asesor (ej. 1001.jpg). Puedes subir varias a la vez.</p>
  <p class="mu">${S.msg||`Puntos: ${S.puntos.length} · Personal: ${S.personal.length} · Cumplimiento punto: ${S.cumpl.length} · Tarea diaria: ${S.tarea.length} · Tarea de hoy: ${S.hoy.length}`}</p></div>`;
@@ -133,7 +133,7 @@ function demo(){
  S.msg='Ejemplo cargado';save();render();
 }
 
-let DB=null,USR=null,ADV=null,tries=0,LOADED=false,LOCKED=0;
+let DB=null,USR=null,ADV=null,tries=0,LOADED=false,LOCKED=0,NEEDFIX=0;
 const PRODS=['Chance','Lotería virtual','Lotería física','Baloto','Astro millonario','Kash','Raspa y gana','Recargas','Betplay','Giros pagados','Giros enviados','Recaudos','Corresponsalía'];
 const mergeRows=(a,b,kf)=>{const m=new Map();a.forEach(r=>m.set(kf(r),r));b.forEach(r=>m.set(kf(r),r));return[...m.values()]};
 const kC=r=>[norm(r.punto),r.fecha||r.periodo,r.ind].join('|');
@@ -242,7 +242,7 @@ async function loadDB(){
   pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp,ord:x.ord??1e9});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],po:r[4]?1:0,cargado:r[5]||'',periodo:r[0].slice(0,7),fecha:r[0]}))});
   S.cumpl=mergeRows(cum.map(r=>({...r,ind:canon(r.ind)})),S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH);
   if(!S.personal.length)S.personal=per.sort((a,b)=>a.ord-b.ord);if(!S.puntos.length)S.puntos=pts.filter(x=>x.name).sort((a,b)=>a.ord-b.ord);
-  LOADED=true;stampAll();S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
+  LOADED=true;stampAll();NEEDFIX=cleanBad();S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
  }catch(e){S.msg='No pude cargar el historial guardado.'}
 }
 async function pub(){
@@ -302,6 +302,13 @@ const pL=P=>lastInfo((P.days||[]).map(d=>[d.f,d.i,d.m,d.r,d.po])),pAvg=P=>{const
 const mergeLocked=(old,add,kf)=>{const T=tod(),m=new Map();old.forEach(r=>m.set(kf(r),r));LOCKED=0;
  add.forEach(r=>{const k=kf(r),e=m.get(k);if(e&&e.cargado&&e.cargado!=T){LOCKED++;return}m.set(k,{...r,cargado:T})});return[...m.values()]};
 function stampAll(){const T=tod();[S.cumpl,S.tarea,S.hoy].forEach(a=>a.forEach(r=>{if(!r.cargado)r.cargado=T}))}
+function cleanBad(){const b=S.cumpl.length;S.cumpl=S.cumpl.filter(r=>!(r.po&&r.fecha&&r.cargado&&r.fecha>=r.cargado));return b-S.cumpl.length}
+function delDia(){const T=tod(),f=toISO(prompt('¿Qué fecha quieres borrar? Solo se borra lo que cargaste hoy. Escribe AAAA-MM-DD'));
+ if(!f)return;const n=[S.cumpl,S.tarea,S.hoy].reduce((s,a)=>s+a.filter(r=>r.fecha==f&&r.cargado==T).length,0);
+ if(!n){S.msg='No hay datos del '+f+' cargados hoy. Los de días anteriores no se pueden borrar.';return render()}
+ if(!confirm('Se borrarán '+n+' filas del '+f+' que cargaste hoy. ¿Continuar?'))return;
+ S.cumpl=S.cumpl.filter(r=>!(r.fecha==f&&r.cargado==T));S.tarea=S.tarea.filter(r=>!(r.fecha==f&&r.cargado==T));S.hoy=S.hoy.filter(r=>!(r.fecha==f&&r.cargado==T));
+ S.msg='Borradas '+n+' filas del '+f+'. Vuelve a subir lo correcto.';save();render();if(DB&&LOADED)pub()}
 function delToday(){const T=tod(),n=[S.cumpl,S.tarea,S.hoy].reduce((s,a)=>s+a.filter(r=>r.cargado==T).length,0);
  if(!n){S.msg='No hay nada cargado hoy para borrar. Los datos de días anteriores no se pueden borrar.';return render()}
  if(!confirm('Se borrarán '+n+' filas cargadas HOY. Los datos de días anteriores no se tocan. ¿Continuar?'))return;
@@ -343,6 +350,7 @@ function imgHtml(){const I=S.img,ok=p=>S.puntos.some(x=>norm(x.name)==norm(p));
 async function imgSave(){const I=S.img,bf=toISO(I.fecha);
  if(!bf&&I.items.some(it=>!toISO(it.fecha))){S.msg='Escribe la fecha del cumplimiento.';return render()}
  if(I.items.some(it=>!String(it.punto).trim())){S.msg='Hay puntos sin nombre. Ábrelos y escribe el punto.';return render()}
+ if(I.items.some(it=>{const f=toISO(it.fecha)||bf;return !f||f>=tod()})){S.msg='La fecha del cumplimiento debe ser anterior a hoy: es el reporte del día anterior.';return render()}
  let n=0;const rows=[];
  I.items.forEach(it=>{const f=toISO(it.fecha)||bf,pn=(S.puntos.find(p=>norm(p.name)==norm(it.punto))||{name:String(it.punto).trim()}).name,seen={};
   it.rows.forEach(r=>{const ind=canon(r.p);if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){seen[ind]=1;rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
@@ -380,6 +388,6 @@ S.mode=null;render();
  if(DB&&!isOwn()){try{const c=await DB.doc('config/app').get();if(c.exists&&c.data().logo)S.logo=c.data().logo}catch(e){}}
  if(!isOwn()&&location.hash=='#admin'){adminForm();return}
  S.mode=(isOwn()&&location.hash=='#admin')?'admin':'asesor';render();
- if(S.mode=='admin'&&DB){S.msg='Cargando historial guardado…';render();await loadDB();save();render()}
+ if(S.mode=='admin'&&DB){S.msg='Cargando historial guardado…';render();await loadDB();save();render();if(NEEDFIX){const m0='Se quitaron '+NEEDFIX+' datos con fecha igual o posterior al día en que se cargaron (cargas de prueba).';NEEDFIX=0;await pub();S.msg=m0+' · '+S.msg;render()}}
 })();
 </script></body></html>
