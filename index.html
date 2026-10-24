@@ -56,7 +56,8 @@ input[type=date]{width:100%;padding:10px;border-radius:8px;border:1px solid var(
 <script>
 let S={hoy:[],tarea:[],fotos:{},logo:'',puntos:[],personal:[],cumpl:[],punto:null,q:'',msg:''};
 try{const x=localStorage.getItem('zns');if(x)Object.assign(S,JSON.parse(x),{punto:null,q:'',msg:''})}catch(e){}
-const save=()=>{try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,tpl:S.tpl,hoy:S.hoy,tarea:S.tarea,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal,cumpl:S.cumpl}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,tpl:S.tpl,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
+S.cumpl=[];S.tarea=[];S.hoy=[];S.tpl={};
+const save=()=>{try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const pick=(r,keys)=>{for(const k of Object.keys(r)){const n=norm(k);if(keys.some(x=>n.includes(x)))return r[k]}return ''};
 const num=v=>{const n=parseFloat(String(v).replace('%','').replace(',','.'));return isNaN(n)?0:n};
@@ -70,7 +71,7 @@ function read(file,kind){
   const rows=aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')).map(r=>{const o={};hd.forEach((k,i)=>{if(k)o[k]=r[i]??''});return o});
   if(kind=='v')S.puntos=rows.map(r=>({name:String(pick(r,['punto','nombre','sucursal','oficina'])).trim(),ciudad:pick(r,['ciudad','municipio','direccion']),resp:pick(r,['responsable','coordinador','encargado','lider'])})).filter(x=>x.name);else if(kind=='p')S.personal=rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),cargo:pick(r,['cargo']),clave:String(pick(r,['clave','pin'])).trim(),punto:String(pick(r,['punto','sucursal','oficina'])).trim()||'Sin punto'}));
   else if(kind=='t')S.tarea=mergeLocked(S.tarea,parseC(rows,PRODT),kT);else if(kind=='h')S.hoy=mergeLocked(S.hoy,rows.map(r=>({id:String(pick(r,['cedula','documento','id'])).trim(),nombre:String(pick(r,['nombre','asesor','empleado'])).trim(),fecha:toISO(pick(r,['fecha','dia'])),prod:cT(String(pick(r,['producto','indicador'])).trim()),valor:num(pick(r,['valor','cantidad','meta'])),ta:nv(pick(r,['tarea de ayer','tarea ayer'])),ra:nv(pick(r,['real de ayer','real ayer']))})).filter(x=>x.prod&&x.fecha),kH);else S.cumpl=mergeLocked(S.cumpl,parseC(rows),kC);
-  S.msg=(kind=='v'?'Puntos':kind=='p'?'Personal':kind=='t'?'Tarea diaria':kind=='h'?'Tarea de hoy':'Cumplimientos')+' cargado: '+rows.length+' filas'+warn(kind,rows)+(kind=='p'||kind=='v'?'':' · se suma al historial. Toca Publicar accesos para guardarlo');save();render();if(DB&&LOADED){const m0=S.msg;pub().then(()=>{S.msg=m0+' · '+S.msg;render()})}
+  S.msg=(kind=='v'?'Puntos':kind=='p'?'Personal':kind=='t'?'Tarea diaria':kind=='h'?'Tarea de hoy':'Cumplimientos')+' cargado: '+rows.length+' filas'+warn(kind,rows)+(kind=='p'||kind=='v'?'':' · solo en pantalla: el guardado está desactivado por ahora');save();render();if(SAVE&&DB&&LOADED){const m0=S.msg;pub().then(()=>{S.msg=m0+' · '+S.msg;render()})}
  }catch(err){S.msg='No pude leer el archivo ('+((err&&err.message)||err)+'). Usa Excel (.xlsx) o CSV.';render()}};
  fr.readAsArrayBuffer(file);
 }
@@ -99,12 +100,12 @@ function render(){hdr();
  if(S.mode===null){document.getElementById('app').innerHTML='<p class="mu">Cargando…</p>';return}
  if(S.mode=='asesor'||location.hash=='#asesor')return renderAs();
  const pts=build(),A=document.getElementById('app');
- let h=(S.img?imgHtml():'')+(S.imgA?imgAHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos Lotería virtual, Tripletazo, CH millonario, Local ch millo, Superchance, Baloto, Miloto, Kash, Raspa y listo y Quinta. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
+ let h=(S.img?imgHtml():'')+(S.imgA?imgAHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu" style="color:#d99100">⚠ Guardado desactivado por ahora: lo que subas se ve en pantalla, pero se pierde al cerrar o recargar.</p><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos Lotería virtual, Tripletazo, CH millonario, Local ch millo, Superchance, Baloto, Miloto, Kash, Raspa y listo y Quinta. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
  <div class="row"><label class="b">📍 Puntos de venta<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'v')"></label>
  <label class="b">👥 Personal<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'p')"></label>
  <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">📷 Imágenes cumplimiento asesores<input type="file" accept="image/*" multiple onchange="imgAUp(this.files,'real')"></label><label class="b">📷 Imagen tarea de hoy<input type="file" accept="image/*" multiple onchange="imgAUp(this.files,'tarea')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
  <button class="s" onclick="delDia()">🗑 Borrar un día cargado hoy</button></div>
- <div class="row" style="margin-top:8px"><button onclick="pub()">🔑 Publicar accesos de asesores</button><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
+ <div class="row" style="margin-top:8px"><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
  <div class="row" style="margin-top:8px"><label class="b">📷 Fotos de asesores<input type="file" accept="image/*" multiple onchange="fotos(this.files)"></label></div><p class="mu">Fotos: nombra cada archivo con la cédula del asesor (ej. 1001.jpg). Puedes subir varias a la vez.</p>
  <p class="mu">${S.msg||`Puntos: ${S.puntos.length} · Personal: ${S.personal.length} · Cumplimiento punto: ${S.cumpl.length} · Tarea diaria: ${S.tarea.length} · Tarea de hoy: ${S.hoy.length}`}</p></div>`;
  if(S.punto&&pts[S.punto]){
@@ -133,6 +134,7 @@ function demo(){
  S.msg='Ejemplo cargado';save();render();
 }
 
+const SAVE=false;
 let DB=null,USR=null,ADV=null,tries=0,LOADED=false,LOCKED=0,NEEDFIX=0;
 const PRODS=['Chance','Lotería virtual','Lotería física','Baloto','Astro millonario','Kash','Raspa y gana','Recargas','Betplay','Giros pagados','Giros enviados','Recaudos','Corresponsalía'];
 const mergeRows=(a,b,kf)=>{const m=new Map();a.forEach(r=>m.set(kf(r),r));b.forEach(r=>m.set(kf(r),r));return[...m.values()]};
@@ -224,7 +226,7 @@ function rs(file,max,sq,cb){const im=new Image(),u=URL.createObjectURL(file);im.
   if(sq){const s=Math.min(im.width,im.height);c.width=c.height=max;x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,max,max)}
   else{const k=Math.min(1,max/Math.max(im.width,im.height));c.width=im.width*k;c.height=im.height*k;x.drawImage(im,0,0,c.width,c.height)}
   URL.revokeObjectURL(u);cb(c.toDataURL(sq?'image/jpeg':'image/png',.8))};im.onerror=()=>cb(null);im.src=u}
-function fotos(files){let n=0,t=files.length;[...files].forEach(f=>{const id=did(f.name.replace(/\.[^.]+$/,''));rs(f,160,true,d=>{if(d){S.fotos[id]=d;n++}if(--t==0){S.msg='Fotos cargadas: '+n+'.';save();render();if(DB&&LOADED){const m0=S.msg;pub().then(()=>{S.msg=m0+' · '+S.msg;render()})}}})})}
+function fotos(files){let n=0,t=files.length;[...files].forEach(f=>{const id=did(f.name.replace(/\.[^.]+$/,''));rs(f,160,true,d=>{if(d){S.fotos[id]=d;n++}if(--t==0){S.msg='Fotos cargadas: '+n+'.';save();render();if(SAVE&&DB&&LOADED){const m0=S.msg;pub().then(()=>{S.msg=m0+' · '+S.msg;render()})}}})})}
 function logoUp(f){if(!f)return;rs(f,400,false,d=>{if(d){S.logo=d;save();S.msg='Logo actualizado. Toca Publicar accesos para que lo vean los asesores.';render()}})}
 async function sha(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 const did=c=>String(c).replace(/[^A-Za-z0-9_-]/g,'');
@@ -240,10 +242,13 @@ async function loadDB(){
    (x.tdias||[]).forEach(r=>tar.push({id,nombre:x.nombre,punto:'',ind:r[1],meta:r[2],res:r[3],cargado:r[5]||'',periodo:r[0].slice(0,7),fecha:r[0]}));
    (x.hoy||[]).forEach(r=>hoy.push({id,nombre:x.nombre,fecha:r[0],prod:r[1],valor:r[2],ta:r[3],ra:r[4],cargado:r[5]||''}))});
   pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp,ord:x.ord??1e9});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],po:r[4]?1:0,cargado:r[5]||'',periodo:r[0].slice(0,7),fecha:r[0]}))});
-  S.cumpl=mergeRows(cum.map(r=>({...r,ind:canon(r.ind)})),S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH);
+  if(SAVE){S.cumpl=mergeRows(cum.map(r=>({...r,ind:canon(r.ind)})),S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH)}
   if(!S.personal.length)S.personal=per.sort((a,b)=>a.ord-b.ord);if(!S.puntos.length)S.puntos=pts.filter(x=>x.name).sort((a,b)=>a.ord-b.ord);
-  try{const c=await DB.doc('config/app').get();if(c.exists&&c.data().pmap)S.pmap={...c.data().pmap,...(S.pmap||{})}}catch(e){}
-  LOADED=true;stampAll();NEEDFIX=cleanBad();{const mg=migrateT();NEEDFIX+=mg.ren+mg.del}S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
+  let wiped=false;try{const c=await DB.doc('config/app').get(),cd=c.exists?c.data():{};if(cd.pmap)S.pmap={...cd.pmap,...(S.pmap||{})};
+  if(!cd.wipeV1){for(const d of a.docs){await DB.doc('asesores/'+d.id).set({...d.data(),tdias:[],hoy:[],mine:[],pt:[],pp:0})}
+   for(const d of pu.docs){await DB.doc('puntos/'+d.id).set({...d.data(),dias:[]})}
+   await DB.doc('config/app').set({...cd,wipeV1:true});wiped=true}}catch(e){}
+  LOADED=true;stampAll();if(SAVE){NEEDFIX=cleanBad();const mg=migrateT();NEEDFIX+=mg.ren+mg.del}S.msg=wiped?'Se borraron los datos de vendedores guardados en la nube. Configuración, Personal y Puntos se conservaron.':'';
  }catch(e){S.msg='No pude cargar el historial guardado.'}
 }
 async function pub(){
@@ -251,7 +256,7 @@ async function pub(){
  if(!LOADED){S.msg='El historial guardado aún no cargó. Espera un momento y vuelve a intentar.';return render()}
  const pts=build();let n=0,np=0;
  try{
-  await DB.doc('config/app').set({logo:S.logo||'',pmap:S.pmap||{}});
+  await DB.doc('config/app').set({logo:S.logo||'',pmap:S.pmap||{},wipeV1:true});
   let oi=0;
   for(const P of Object.values(pts)){
    if(!P.name||P.name=='Sin asignar')continue;
@@ -285,7 +290,7 @@ const tod=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()
 async function myPhoto(f){if(!f||!ADV||!isOwn())return;
  rs(f,160,true,async d=>{if(!d){S.msg='No pude leer esa imagen.';return render()}
   ADV.foto=d;S.fotos[did(ADV.id)]=d;save();S.msg='Foto guardada.';render();
-  if(DB&&LOADED){await pub();S.msg='Foto guardada y publicada.';render()}})}
+  if(SAVE&&DB&&LOADED){await pub();S.msg='Foto guardada y publicada.';render()}})}
 const KNOWN=[...new Set([...PRODS,...PRODT])];
 const lev=(a,b)=>{const m=[];for(let i=0;i<=a.length;i++)m[i]=[i];for(let j=1;j<=b.length;j++)m[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]==b[j-1]?0:1));return m[a.length][b.length]};
 const ALIAS={'local chance millonario':'Local ch millo','local ch millonario':'Local ch millo','local ch millo':'Local ch millo','chance millonario':'CH millonario','ch millo':'CH millonario','chmillo':'CH millonario','localchmillo':'Local ch millo','ras y list':'Raspa y listo','ras y listo':'Raspa y listo','rasylist':'Raspa y listo','rasylisto':'Raspa y listo','raspa y list':'Raspa y listo','l virtual':'Lotería virtual','lvirtual':'Lotería virtual'};
@@ -314,12 +319,55 @@ function delDia(){const T=tod(),f=toISO(prompt('¿Qué fecha quieres borrar? Sol
  if(!n){S.msg='No hay datos del '+f+' cargados hoy. Los de días anteriores no se pueden borrar.';return render()}
  if(!confirm('Se borrarán '+n+' filas del '+f+' que cargaste hoy. ¿Continuar?'))return;
  S.cumpl=S.cumpl.filter(r=>!(r.fecha==f&&r.cargado==T));S.tarea=S.tarea.filter(r=>!(r.fecha==f&&r.cargado==T));S.hoy=S.hoy.filter(r=>!(r.fecha==f&&r.cargado==T));
- S.msg='Borradas '+n+' filas del '+f+'. Vuelve a subir lo correcto.';save();render();if(DB&&LOADED)pub()}
+ S.msg='Borradas '+n+' filas del '+f+'. Vuelve a subir lo correcto.';save();render();if(SAVE&&DB&&LOADED)pub()}
 function delToday(){const T=tod(),n=[S.cumpl,S.tarea,S.hoy].reduce((s,a)=>s+a.filter(r=>r.cargado==T).length,0);
  if(!n){S.msg='No hay nada cargado hoy para borrar. Los datos de días anteriores no se pueden borrar.';return render()}
  if(!confirm('Se borrarán '+n+' filas cargadas HOY. Los datos de días anteriores no se tocan. ¿Continuar?'))return;
  S.cumpl=S.cumpl.filter(r=>r.cargado!=T);S.tarea=S.tarea.filter(r=>r.cargado!=T);S.hoy=S.hoy.filter(r=>r.cargado!=T);
- S.msg='Borradas '+n+' filas cargadas hoy. Vuelve a subir lo correcto.';save();render();if(DB&&LOADED)pub()}
+ S.msg='Borradas '+n+' filas cargadas hoy. Vuelve a subir lo correcto.';save();render();if(SAVE&&DB&&LOADED)pub()}
+function parsePanel(W){
+ const cl=t=>/^[-–—]$/.test(t)?'-':String(t).replace(/^[^\dA-Za-zÁÉÍÓÚÑáéíóúñ]+|[^\dA-Za-zÁÉÍÓÚÑáéíóúñ%]+$/g,'');
+ W=W.map(w=>({...w,t:cl(w.t)})).filter(w=>w.t);if(!W.length)return{rows:[],punto:''};
+ const H=W.map(w=>w.y1-w.y0).sort((a,b)=>a-b)[Math.floor(W.length/2)]||20,PC=/^(\d{1,3}(?:[.,]\d{1,2})?)%$/;
+ const ws=[...W].sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),R=[];
+ ws.forEach(w=>{const yc=(w.y0+w.y1)/2,r=R[R.length-1];if(r&&Math.abs(yc-r.yc)<H*0.6){r.w.push(w);r.yc=(r.yc*(r.w.length-1)+yc)/r.w.length}else R.push({yc,w:[w]})});
+ R.forEach(r=>r.w.sort((a,b)=>a.x0-b.x0));
+ const tr=R.find(r=>r.w.some(w=>/^CANAL$/i.test(w.t)))||R[0];let punto='';
+ {const di=tr.w.findIndex(w=>w.t=='-'||/^[-–—]$/.test(w.t));const src=di>=0?tr.w.slice(di+1):[];punto=src.map(w=>w.t).join(' ').trim()}
+ const labs=[],pcs=[];
+ R.forEach(r=>{if(r===tr)return;let cur=null;
+  r.w.forEach(w=>{const m=w.t.match(PC);
+   if(m){pcs.push({v:parseFloat(m[1].replace(',','.')),raw:m[1],y:r.yc,x0:w.x0});cur=null}
+   else if(/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(w.t)||(w.t=='Y'&&cur)){if(cur&&w.x0-cur.x1<2.4*H){cur.t+=' '+w.t;cur.x1=w.x1}else{cur={t:w.t,x0:w.x0,x1:w.x1,y:r.yc};labs.push(cur)}}
+   else cur=null})});
+ labs.sort((a,b)=>a.y-b.y);pcs.sort((a,b)=>a.y-b.y);
+ const best=new Map();
+ pcs.forEach(p=>{let L=null;labs.forEach(l=>{if(l.y<=p.y+0.6*H&&p.y-l.y<4.5*H&&(!L||l.y>L.y))L=l});
+  if(L){const d=Math.abs(p.y-L.y),o=best.get(L);if(!o||d<o.d)best.set(L,{p,d})}});
+ const rows=[...best.entries()].map(([l,o])=>({p:canon(l.t),pct:o.p.v,y:o.p.y,x0:o.p.x0,raw:o.p.raw})).sort((a,b)=>a.y-b.y);
+ const used=new Set(best.keys()),diffs=[...best.entries()].map(([l,o])=>o.p.y-l.y).sort((a,b)=>a-b);
+ return{rows,punto,H,miss:labs.filter(l=>!used.has(l)).map(l=>({t:l.t,y:l.y})),off:diffs.length?diffs[Math.floor(diffs.length/2)]:0,xcol:Math.min(1e9,...pcs.map(p=>p.x0))}}
+function barPx(img,Wd,y,xmax){let best=0;for(let dy=-2;dy<=2;dy++){const yy=Math.round(y)+dy;if(yy<0)continue;let s=-1,e=-1,gap=0;
+  for(let x=0;x<xmax&&x<Wd;x++){const i=(yy*Wd+x)*4,r=img[i],g=img[i+1],b=img[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+   if(mx-mn>70&&mx>110){if(s<0)s=x;e=x;gap=0}else if(s>=0){gap++;if(gap>5)break}}
+  if(s>=0)best=Math.max(best,e-s+1)}return best}
+function fixPct(str,pred){let b=null;const ch=str.split('');
+ for(let i=0;i<ch.length;i++){if(!/\d/.test(ch[i]))continue;for(let d=0;d<10;d++){if(String(d)==ch[i])continue;const c=ch.slice();c[i]=String(d);const v=parseFloat(c.join('').replace(',','.'));if(isNaN(v))continue;const e=Math.abs(v-pred);if(!b||e<b.e)b={v,e}}}
+ return b&&b.e<=Math.max(1,0.03*pred)?b.v:null}
+function checkBars(rows,img,Wd,sc){
+ rows.forEach(r=>{r.px=barPx(img,Wd,r.y/sc,Math.max(0,r.x0/sc-6))});
+ const mxp=Math.max(0,...rows.map(r=>r.px)),S=rows.filter(r=>r.px>25&&r.pct>3&&r.pct<140&&r.px<mxp*0.97).map(r=>r.px/r.pct).sort((a,b)=>a-b);
+ if(S.length<3)return;const slope=S[Math.floor(S.length/2)];
+ rows.forEach(r=>{if(r.px>=mxp*0.97&&mxp>0&&r.pct>=100)return;const pred=r.px/slope;
+  if(Math.abs(r.pct-pred)>Math.max(2.5,0.06*pred)){const f=r.px>3?fixPct(r.raw,pred):null;
+   if(f!=null){r.note='⚠ corregido por la barra (leí '+r.raw+'%)';r.pct=f}else r.note='⚠ revisa este valor: la barra indica cerca de '+pred.toFixed(1)+'%'}})}
+async function prepPanel(file){const bmp=await createImageBitmap(file),sc=bmp.width<1000?2:1,c0=document.createElement('canvas');c0.width=bmp.width;c0.height=bmp.height;
+ const x0=c0.getContext('2d');x0.drawImage(bmp,0,0);const id=x0.getImageData(0,0,c0.width,c0.height),src=id.data;
+ const c=document.createElement('canvas');c.width=bmp.width*sc;c.height=bmp.height*sc;const t=document.createElement('canvas');t.width=bmp.width;t.height=bmp.height;
+ const tx=t.getContext('2d'),od=tx.createImageData(t.width,t.height),o=od.data;
+ for(let i=0;i<src.length;i+=4){const v=255-Math.max(src[i],src[i+1],src[i+2]);o[i]=o[i+1]=o[i+2]=v;o[i+3]=255}
+ tx.putImageData(od,0,0);const cx=c.getContext('2d');cx.imageSmoothingQuality='high';cx.drawImage(t,0,0,c.width,c.height);
+ return{canvas:c,img:src,Wd:bmp.width,sc}}
 function parseImg(t){const L=t.split(/\n+/).map(x=>x.trim()).filter(Boolean);let punto='';const rows=[];
  L.forEach(l=>{const m=l.match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*%\s*$/);
   if(!m){if(!punto&&/\s-\s/.test(l))punto=l.split(/\s-\s/).pop().trim();return}
@@ -339,7 +387,16 @@ async function imgUp(files){files=[...(files||[])];if(!files.length)return;
  const items=[],fail=[];
  try{const w=await Tesseract.createWorker('eng');await w.setParameters({tessedit_pageseg_mode:'6'});
   for(let i=0;i<files.length;i++){S.msg='Leyendo imagen '+(i+1)+' de '+files.length+'…';render();
-   try{const r=await w.recognize(files[i]),txt=r.data.text||'',P=parseImg(txt);
+   try{let P={rows:[],punto:''},txt='';
+    try{const pp=await prepPanel(files[i]);await w.setParameters({tessedit_pageseg_mode:'11'});const r0=await w.recognize(pp.canvas);txt=r0.data.text||'';const Q=parsePanel(wordsFrom(r0.data));
+     if(Q.rows.length>=3){
+     if(Q.miss&&Q.miss.length&&Q.xcol<1e9){await w.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'0123456789.%'});
+      for(const m of Q.miss){const ey=m.y+Q.off,sx=Math.max(0,Q.xcol-18),sy=Math.max(0,ey-1.6*Q.H),hh=Math.min(pp.canvas.height-sy,3.2*Q.H),cw=pp.canvas.width-sx,cc=document.createElement('canvas');cc.width=cw*3;cc.height=hh*3;
+       cc.getContext('2d').drawImage(pp.canvas,sx,sy,cw,hh,0,0,cc.width,cc.height);const rr=await w.recognize(cc),mm=String(rr.data.text||'').replace(/\s/g,'').match(/(\d{1,3}[.,]\d{1,2})%?/);
+       if(mm)Q.rows.push({p:canon(m.t),pct:parseFloat(mm[1].replace(',','.')),y:ey,x0:sx,raw:mm[1]})}
+      Q.rows.sort((a,b)=>a.y-b.y);await w.setParameters({tessedit_char_whitelist:''})}
+     checkBars(Q.rows,pp.img,pp.Wd,pp.sc);P={rows:Q.rows.map(x=>({p:x.p,pct:x.pct,note:x.note||''})),punto:Q.punto}}}catch(e0){}
+    if(!P.rows.length){await w.setParameters({tessedit_pageseg_mode:'6'});const r=await w.recognize(files[i]);txt=r.data.text||'';P=parseImg(txt)}
     if(!P.rows.length){fail.push(files[i].name||('imagen '+(i+1)));continue}
     let m=matchPunto(P.punto);
     if(!m){const top=txt.split('\n').slice(0,4).map(norm).join(' ');m=pCands().sort((a,b)=>b.length-a.length).find(c=>norm(c).length>3&&top.includes(norm(c)))||''}
@@ -356,13 +413,13 @@ function imgHtml(){const I=S.img,C=pCands(),ok=p=>C.some(x=>norm(x)==norm(p)),cn
  <datalist id="lp">${C.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
  <p class="mu" style="margin:6px 0 0">Fecha del cumplimiento (normalmente el día anterior):</p>
  <input type="date" value="${esc(I.fecha)}" oninput="S.img.fecha=this.value">
- ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.img.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.punto||'(sin punto)')}</b> · ${it.rows.length} productos${ok(it.punto)?'':' ⚠ no coincide con tus puntos'}${it.punto&&cnt(it.punto)>1?' ⚠ repetido':''}${it.fecha?' · '+esc(it.fecha):''}<br><span class="mu">📎 ${esc(it.src||'')}${it.det&&norm(it.det)!=norm(it.punto)?' · en la imagen decía: '+esc(it.det):''}</span></summary>
+ ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.img.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.punto||'(sin punto)')}</b> · ${it.rows.length} productos${ok(it.punto)?'':' ⚠ no coincide con tus puntos'}${it.punto&&cnt(it.punto)>1?' ⚠ repetido':''}${it.rows.some(r=>r.note)?' ⚠ revisar valores':''}${it.fecha?' · '+esc(it.fecha):''}<br><span class="mu">📎 ${esc(it.src||'')}${it.det&&norm(it.det)!=norm(it.punto)?' · en la imagen decía: '+esc(it.det):''}</span></summary>
  <input type="text" list="lp" value="${esc(it.punto)}" placeholder="Punto de venta" oninput="S.img.items[${n}].punto=this.value">
  <p class="mu" style="margin:4px 0 0">Fecha solo de este punto (opcional):</p>
  <input type="date" value="${esc(it.fecha)}" oninput="S.img.items[${n}].fecha=this.value">
- ${it.rows.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.img.items[${n}].rows[${i}].p=this.value"><input type="text" inputmode="decimal" value="${r.pct}" style="width:90px" oninput="S.img.items[${n}].rows[${i}].pct=this.value"><button class="s" onclick="S.img.items[${n}].rows.splice(${i},1);S.img.items[${n}].open=true;render()">✖</button></div>`).join('')}
+ ${it.rows.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.img.items[${n}].rows[${i}].p=this.value"><input type="text" inputmode="decimal" value="${r.pct}" style="width:90px" oninput="S.img.items[${n}].rows[${i}].pct=this.value"><button class="s" onclick="S.img.items[${n}].rows.splice(${i},1);S.img.items[${n}].open=true;render()">✖</button></div>${r.note?`<div class="mu" style="font-size:12px;color:#d99100">${esc(r.note)}</div>`:''}`).join('')}
  <button class="s" onclick="S.img.items.splice(${n},1);render()">Quitar este punto</button></details>`).join('')}
- <div class="row" style="margin-top:8px"><button onclick="imgSave()">✅ Guardar todo (${I.items.length})</button><button class="s" onclick="S.img=null;render()">Cancelar</button></div></div>`}
+ <div class="row" style="margin-top:8px"><button onclick="imgSave()">✅ Cargar todo (sin guardar) (${I.items.length})</button><button class="s" onclick="S.img=null;render()">Cancelar</button></div></div>`}
 async function imgSave(){const I=S.img,bf=toISO(I.fecha);
  if(!bf&&I.items.some(it=>!toISO(it.fecha))){S.msg='Escribe la fecha del cumplimiento.';return render()}
  if(I.items.some(it=>!String(it.punto).trim())){S.msg='Hay puntos sin nombre. Ábrelos y escribe el punto.';return render()}
@@ -374,8 +431,8 @@ async function imgSave(){const I=S.img,bf=toISO(I.fecha);
   if(it.det&&norm(it.det)!=norm(pn)&&C.some(c=>c==pn))S.pmap[norm(it.det)]=pn;
   it.rows.forEach(r=>{const ind=canon(r.p);if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
  S.cumpl=mergeLocked(S.cumpl,rows,kC);const lk=LOCKED,np=I.items.length;S.img=null;
- S.msg='Guardado: '+np+' puntos, '+n+' productos'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+'.';save();render();
- if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
+ S.msg='Cargado en pantalla: '+np+' puntos, '+n+' productos'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+'.';save();render();
+ if(SAVE&&DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
 function wordsFrom(d){if(d.words&&d.words.length)return d.words.map(w=>({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1}));
  return String(d.tsv||'').split('\n').map(l=>l.split('\t')).filter(c=>c[0]=='5'&&(c[11]||'').trim()).map(c=>({t:c[11].trim(),x0:+c[6],y0:+c[7],x1:+c[6]+ +c[8],y1:+c[7]+ +c[9]}))}
 function parsePivot(W){
@@ -443,7 +500,7 @@ function imgAHtml(){const I=S.imgA,T=I.modo=='tarea';
  <input type="text" value="${esc(it.nombre)}" placeholder="Nombre" oninput="S.imgA.items[${n}].nombre=this.value">
  ${it.vals.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.imgA.items[${n}].vals[${i}].p=this.value"><input type="text" inputmode="numeric" value="${r.v}" style="width:110px" oninput="S.imgA.items[${n}].vals[${i}].v=this.value"><button class="s" onclick="S.imgA.items[${n}].vals.splice(${i},1);S.imgA.items[${n}].open=true;render()">✖</button></div>`).join('')}
  <button class="s" onclick="S.imgA.items.splice(${n},1);render()">Quitar este asesor</button></details>`}).join('')}
- <div class="row" style="margin-top:8px"><button onclick="imgASave()">✅ Guardar todo (${I.items.length})</button><button class="s" onclick="S.imgA=null;render()">Cancelar</button></div></div>`}
+ <div class="row" style="margin-top:8px"><button onclick="imgASave()">✅ Cargar todo (sin guardar) (${I.items.length})</button><button class="s" onclick="S.imgA=null;render()">Cancelar</button></div></div>`}
 async function imgASave(){const I=S.imgA,f=toISO(I.fecha),T=I.modo=='tarea';
  if(!f||(!T&&f>=tod())){S.msg='La fecha debe ser anterior a hoy: es el cumplimiento del día anterior.';return render()}
  if(T&&f<tod()){S.msg='La fecha de la tarea debe ser hoy o una fecha futura.';return render()}
@@ -452,8 +509,8 @@ async function imgASave(){const I=S.imgA,f=toISO(I.fecha),T=I.modo=='tarea';
   it.vals.forEach(r=>{const ind=cT(r.p),v=parseInt(String(r.v).replace(/[^\d]/g,''),10);if(ind&&!isNaN(v)){rows.push(T?{id,nombre,fecha:f,prod:ind,valor:v,ta:null,ra:null}:{id,nombre,punto:'',ind,meta:0,res:v,periodo:f.slice(0,7),fecha:f});n++}})});
  if(T)S.hoy=mergeLocked(S.hoy,rows,kH);else S.tarea=mergeLocked(S.tarea,rows,kT);
  const lk=LOCKED,na=I.items.length;S.imgA=null;
- S.msg='Guardado: '+na+' asesores, '+n+(T?' tareas (':' valores (')+f+')'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+(sin?'. ⚠ '+sin+' asesor(es) con cédula que no está en Personal: no se verán hasta que los agregues':'')+'.';save();render();
- if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
+ S.msg='Cargado en pantalla: '+na+' asesores, '+n+(T?' tareas (':' valores (')+f+')'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+(sin?'. ⚠ '+sin+' asesor(es) con cédula que no está en Personal: no se verán hasta que los agregues':'')+'.';save();render();
+ if(SAVE&&DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
 function ayerHtml(){const T=tod(),t=HD||T,ds=[...new Set((ADV.tdias||[]).map(x=>x[0]))].filter(d=>d<t).sort(),p=ds[ds.length-1];
  if(!p)return '<p class="mu">Aún no hay cumplimiento del día anterior cargado.</p>';
  const M=new Map(),add=(k,a,v)=>{const q=norm(canonT(k)||canon(k));let e=M.get(q);if(!e){e={k:canonT(k)||canon(k),task:null,real:null};M.set(q,e)}e[a]=(e[a]||0)+v};
@@ -462,6 +519,13 @@ function ayerHtml(){const T=tod(),t=HD||T,ds=[...new Set((ADV.tdias||[]).map(x=>
  return `<p class="mu" style="margin:0 0 6px">${esc(fmtD(p))}</p><div class="tw"><table><tr><th>Producto</th><th>Tarea</th><th>Real</th><th>%</th></tr>${L.map(e=>`<tr><td>${esc(e.k)}</td><td>${f(e.task)}</td><td>${f(e.real)}</td><td>${e.pc==null?'—':pill(e.pc,1)}</td></tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día</b>${pill(pa,1)}</div>`}`}
 function warn(kind,rows){if(!rows.length)return ' ⚠ No encontré filas de datos. Revisa que los títulos estén en la primera fila.';
  if(kind=='h'){const ok=rows.filter(r=>toISO(pick(r,['fecha','dia']))&&String(pick(r,['producto','indicador'])).trim()).length;if(ok<rows.length)return ' ⚠ Solo '+ok+' filas tienen Fecha y Producto reconocidos. Revisa esas dos columnas.'}return LOCKED?' ⚠ '+LOCKED+' filas no se cambiaron: ya son de días anteriores y no se pueden modificar.':''}
+function previewAdv(id){const p=S.personal.find(x=>String(x.id)==String(id));if(!p)return;const pts=build(),key=Object.keys(pts).find(k=>norm(k)==norm(p.punto))||p.punto,P=pts[key]||{name:p.punto,items:[],ases:{},days:[]};
+ const agg={};P.items.forEach(i=>{const a=agg[i.ind]??={ind:i.ind,meta:0,res:0};a.meta+=i.meta;a.res+=i.res});
+ const A=P.ases[p.nombre]||{},hm=new Map(),mn=t=>(t.id&&t.id==p.id)||(!t.id&&norm(t.nombre)==norm(p.nombre));
+ S.hoy.filter(t=>!t.id&&!t.nombre).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));S.hoy.filter(t=>t.id||t.nombre).filter(mn).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
+ ADV={id:p.id,nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:[],
+  hoy:[...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra,t.cargado||'']),tdias:(A.days||[]).map(d=>[d.f,d.i,d.m,d.r,0,d.cg||'']),dias:(P.days||[]).map(d=>[d.f,d.i,d.m,d.r,d.po?1:0,d.cg||''])};
+ S.mode='asesor';render()}
 function hoyNav(n){const c=new Date((HD||tod())+'T12:00:00');c.setDate(c.getDate()+n);const s=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0')+'-'+String(c.getDate()).padStart(2,'0');HD=s>=tod()?'':s;render()}
 function hoyHtml(){const T=tod(),t=HD||T;
  const nav=`<div class="row sp"><button class="s" onclick="hoyNav(-1)">◀</button><b>${t==T?'Hoy · ':''}${esc(fmtD(t))}</b><button class="s" onclick="hoyNav(1)">▶</button></div>`;
@@ -470,7 +534,7 @@ function hoyHtml(){const T=tod(),t=HD||T;
 function renderAs(){
  const A=document.getElementById('app');
  const back=isOwn()&&location.hash=='#admin'?`<button class="s" onclick="ADV=null;S.mode='admin';render()">← Administrador</button>`:'';
- if(!ADV){A.innerHTML=`<div class="card"><b>Acceso de asesor</b><p class="mu">Ingresa tu cédula y tu clave de 4 dígitos.</p><input type="text" id="ci" inputmode="numeric" placeholder="Cédula"><input type="text" id="cl" inputmode="numeric" maxlength="4" placeholder="Clave (4 dígitos)" style="-webkit-text-security:disc"><div class="row"><button onclick="login()">Ingresar</button>${back}</div><p class="mu">${esc(S.msg)}</p></div>`;return}
+ if(!ADV){A.innerHTML=`<div class="card"><b>Acceso de asesor</b><p class="mu">Ingresa tu cédula y tu clave de 4 dígitos.</p><input type="text" id="ci" inputmode="numeric" placeholder="Cédula"><input type="text" id="cl" inputmode="numeric" maxlength="4" placeholder="Clave (4 dígitos)" style="-webkit-text-security:disc"><div class="row"><button onclick="login()">Ingresar</button>${back}</div>${isOwn()&&S.personal.length?`<p class="mu" style="margin-top:12px">Vista previa sin guardar (solo administrador):</p><select onchange="previewAdv(this.value)"><option value="">Elegir asesor…</option>${S.personal.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</select>`:''}<p class="mu">${esc(S.msg)}</p></div>`;return}
  const m=ADV.mine.map(i=>({...i,pc:i.meta?i.res/i.meta*100:0})),pt=ADV.pt.map(i=>({...i,pc:i.meta?i.res/i.meta*100:0})),pa=avg(m);
  const LI=lastInfo(ADV.dias||[]);let ptd=pt,ppd=ADV.pp,lbl='';if(LI.f){ptd=LI.items;ppd=LI.avg;lbl=fmtD(LI.f)}
 
