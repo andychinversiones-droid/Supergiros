@@ -56,7 +56,7 @@ input[type=date]{width:100%;padding:10px;border-radius:8px;border:1px solid var(
 <script>
 let S={hoy:[],tarea:[],fotos:{},logo:'',puntos:[],personal:[],cumpl:[],punto:null,q:'',msg:''};
 try{const x=localStorage.getItem('zns');if(x)Object.assign(S,JSON.parse(x),{punto:null,q:'',msg:''})}catch(e){}
-const save=()=>{try{localStorage.setItem('zns',JSON.stringify({tpl:S.tpl,hoy:S.hoy,tarea:S.tarea,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal,cumpl:S.cumpl}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({tpl:S.tpl,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
+const save=()=>{try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,tpl:S.tpl,hoy:S.hoy,tarea:S.tarea,fotos:S.fotos,logo:S.logo,puntos:S.puntos,personal:S.personal,cumpl:S.cumpl}))}catch(e){try{localStorage.setItem('zns',JSON.stringify({pmap:S.pmap,tpl:S.tpl,puntos:S.puntos,personal:S.personal,logo:S.logo}))}catch(e2){}}};
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const pick=(r,keys)=>{for(const k of Object.keys(r)){const n=norm(k);if(keys.some(x=>n.includes(x)))return r[k]}return ''};
 const num=v=>{const n=parseFloat(String(v).replace('%','').replace(',','.'));return isNaN(n)?0:n};
@@ -242,6 +242,7 @@ async function loadDB(){
   pu.docs.forEach(d=>{const x=d.data();pts.push({name:x.name,ciudad:x.ciudad,resp:x.resp,ord:x.ord??1e9});(x.dias||[]).forEach(r=>cum.push({id:'',nombre:'',punto:x.name,ind:r[1],meta:r[2],res:r[3],po:r[4]?1:0,cargado:r[5]||'',periodo:r[0].slice(0,7),fecha:r[0]}))});
   S.cumpl=mergeRows(cum.map(r=>({...r,ind:canon(r.ind)})),S.cumpl,kC);S.tarea=mergeRows(tar,S.tarea,kT);S.hoy=mergeRows(hoy,S.hoy,kH);
   if(!S.personal.length)S.personal=per.sort((a,b)=>a.ord-b.ord);if(!S.puntos.length)S.puntos=pts.filter(x=>x.name).sort((a,b)=>a.ord-b.ord);
+  try{const c=await DB.doc('config/app').get();if(c.exists&&c.data().pmap)S.pmap={...c.data().pmap,...(S.pmap||{})}}catch(e){}
   LOADED=true;stampAll();NEEDFIX=cleanBad();{const mg=migrateT();NEEDFIX+=mg.ren+mg.del}S.msg=a.docs.length||pu.docs.length?'Historial guardado cargado.':'';
  }catch(e){S.msg='No pude cargar el historial guardado.'}
 }
@@ -250,7 +251,7 @@ async function pub(){
  if(!LOADED){S.msg='El historial guardado aún no cargó. Espera un momento y vuelve a intentar.';return render()}
  const pts=build();let n=0,np=0;
  try{
-  await DB.doc('config/app').set({logo:S.logo||''});
+  await DB.doc('config/app').set({logo:S.logo||'',pmap:S.pmap||{}});
   let oi=0;
   for(const P of Object.values(pts)){
    if(!P.name||P.name=='Sin asignar')continue;
@@ -325,27 +326,37 @@ function parseImg(t){const L=t.split(/\n+/).map(x=>x.trim()).filter(Boolean);let
   const nm=[];for(const k of l.slice(0,m.index).trim().split(/\s+/)){if(/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(k)||(k=='Y'&&nm.length))nm.push(k);else if(nm.length)break}
   if(nm.length)rows.push({p:canon(nm.join(' ')),pct:parseFloat(m[1].replace(',','.'))})});
  return{punto,rows}}
+const GEN=new Set(['pdv','cpm','satelital','cda','punto','canal','de','la','el','los','las']);
+const ptoks=s=>norm(s).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(t=>t&&!GEN.has(t));
+const pCands=()=>[...new Set([...S.puntos.map(p=>p.name),...S.personal.map(p=>p.punto)].map(x=>String(x||'').trim()).filter(Boolean))];
+function matchPunto(n){n=String(n||'').trim();if(!n)return '';S.pmap=S.pmap||{};const k=norm(n);if(S.pmap[k])return S.pmap[k];
+ const C=pCands();let f=C.find(c=>norm(c)==k);if(f)return f;
+ const a=ptoks(n);if(!a.length)return '';let best='',bs=0,tie=false;
+ C.forEach(c=>{const b=ptoks(c),inter=a.filter(t=>b.includes(t)).length,u=new Set([...a,...b]).size,sc=u?inter/u:0;if(sc>bs){bs=sc;best=c;tie=false}else if(sc==bs&&sc>0)tie=true});
+ return(bs>=0.6&&!tie)?best:''}
 async function imgUp(files){files=[...(files||[])];if(!files.length)return;
  S.msg='Leyendo imágenes… la primera vez puede tardar un minuto.';render();
- const raw=[];let bad=0;
+ const items=[],fail=[];
  try{const w=await Tesseract.createWorker('eng');await w.setParameters({tessedit_pageseg_mode:'6'});
   for(let i=0;i<files.length;i++){S.msg='Leyendo imagen '+(i+1)+' de '+files.length+'…';render();
-   try{const r=await w.recognize(files[i]);const P=parseImg(r.data.text||'');if(P.rows.length)raw.push(P);else bad++}catch(e){bad++}}
+   try{const r=await w.recognize(files[i]),txt=r.data.text||'',P=parseImg(txt);
+    if(!P.rows.length){fail.push(files[i].name||('imagen '+(i+1)));continue}
+    let m=matchPunto(P.punto);
+    if(!m){const top=txt.split('\n').slice(0,4).map(norm).join(' ');m=pCands().sort((a,b)=>b.length-a.length).find(c=>norm(c).length>3&&top.includes(norm(c)))||''}
+    const seen={},rows=[];P.rows.forEach(x=>{if(!seen[norm(x.p)]){seen[norm(x.p)]=1;rows.push(x)}});
+    items.push({punto:m||P.punto,det:P.punto,rows,src:files[i].name||('imagen '+(i+1)),open:false,fecha:''})}
+   catch(e){fail.push(files[i].name||('imagen '+(i+1)))}}
   await w.terminate()}
  catch(e){S.msg='No pude leer las imágenes ('+((e&&e.message)||e)+').';return render()}
- if(!raw.length){S.msg='No pude leer productos con porcentaje en esas imágenes. Prueba con capturas más nítidas.';return render()}
- const g=new Map();let rep2=0;
- raw.forEach(P=>{const pm=S.puntos.find(p=>norm(p.name)==norm(P.punto)),name=pm?pm.name:P.punto,k=norm(name);
-  let it=g.get(k);if(it)rep2++;else{it={punto:name,rows:[],fecha:'',open:false};g.set(k,it)}
-  P.rows.forEach(r=>{const j=it.rows.findIndex(x=>norm(x.p)==norm(r.p));if(j>=0)it.rows[j]=r;else it.rows.push(r)})});
- S.img={fecha:yday(),items:[...g.values()]};
- S.msg=g.size+' punto(s) leído(s)'+(rep2?'; '+rep2+' imagen(es) repetida(s) se unieron':'')+(bad?'; '+bad+' no se pudieron leer':'')+'. Revisa la fecha y guarda.';render()}
-function imgHtml(){const I=S.img,ok=p=>S.puntos.some(x=>norm(x.name)==norm(p));
- return `<div class="card"><b>📷 Esto entendí de las imágenes</b><p class="mu">Revisa y corrige antes de guardar. Cada producto se guarda con meta 100 y real = porcentaje.</p>
- <datalist id="lp">${S.puntos.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
+ if(!items.length){S.msg='No pude leer productos con porcentaje en esas imágenes. Prueba con capturas más nítidas.';return render()}
+ S.img={fecha:yday(),items};
+ S.msg=items.length+' de '+files.length+' imagen(es) leída(s)'+(fail.length?'. No se pudieron leer: '+fail.join(', '):'')+'. Revisa la fecha y los puntos y guarda.';render()}
+function imgHtml(){const I=S.img,C=pCands(),ok=p=>C.some(x=>norm(x)==norm(p)),cnt=p=>I.items.filter(x=>norm(x.punto)==norm(p)).length;
+ return `<div class="card"><b>📷 Esto entendí de las imágenes</b><p class="mu">Revisa y corrige antes de guardar. Cada producto se guarda con meta 100 y real = porcentaje. Cada imagen es un punto de venta.</p>
+ <datalist id="lp">${C.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
  <p class="mu" style="margin:6px 0 0">Fecha del cumplimiento (normalmente el día anterior):</p>
  <input type="date" value="${esc(I.fecha)}" oninput="S.img.fecha=this.value">
- ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.img.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.punto||'(sin punto)')}</b> · ${it.rows.length} productos${ok(it.punto)?'':' ⚠ no coincide con tus puntos'}${it.fecha?' · '+esc(it.fecha):''}</summary>
+ ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.img.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.punto||'(sin punto)')}</b> · ${it.rows.length} productos${ok(it.punto)?'':' ⚠ no coincide con tus puntos'}${it.punto&&cnt(it.punto)>1?' ⚠ repetido':''}${it.fecha?' · '+esc(it.fecha):''}<br><span class="mu">📎 ${esc(it.src||'')}${it.det&&norm(it.det)!=norm(it.punto)?' · en la imagen decía: '+esc(it.det):''}</span></summary>
  <input type="text" list="lp" value="${esc(it.punto)}" placeholder="Punto de venta" oninput="S.img.items[${n}].punto=this.value">
  <p class="mu" style="margin:4px 0 0">Fecha solo de este punto (opcional):</p>
  <input type="date" value="${esc(it.fecha)}" oninput="S.img.items[${n}].fecha=this.value">
@@ -356,13 +367,15 @@ async function imgSave(){const I=S.img,bf=toISO(I.fecha);
  if(!bf&&I.items.some(it=>!toISO(it.fecha))){S.msg='Escribe la fecha del cumplimiento.';return render()}
  if(I.items.some(it=>!String(it.punto).trim())){S.msg='Hay puntos sin nombre. Ábrelos y escribe el punto.';return render()}
  if(I.items.some(it=>{const f=toISO(it.fecha)||bf;return !f||f>=tod()})){S.msg='La fecha del cumplimiento debe ser anterior a hoy: es el reporte del día anterior.';return render()}
- let n=0;const rows=[];
- I.items.forEach(it=>{const f=toISO(it.fecha)||bf,pn=(S.puntos.find(p=>norm(p.name)==norm(it.punto))||{name:String(it.punto).trim()}).name,seen={};
-  it.rows.forEach(r=>{const ind=canon(r.p);if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){seen[ind]=1;rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
+ const C=pCands(),seenP={};let dupN=0;I.items.forEach(it=>{const k=norm(it.punto)+'|'+(toISO(it.fecha)||bf);if(seenP[k])dupN++;seenP[k]=1});
+ if(dupN&&!confirm('Hay '+dupN+' punto(s) repetido(s) con la misma fecha. La última imagen reemplaza a la anterior. ¿Guardar igual?'))return;
+ S.pmap=S.pmap||{};let n=0;const rows=[];
+ I.items.forEach(it=>{const f=toISO(it.fecha)||bf,pn=C.find(c=>norm(c)==norm(it.punto))||String(it.punto).trim();
+  if(it.det&&norm(it.det)!=norm(pn)&&C.some(c=>c==pn))S.pmap[norm(it.det)]=pn;
+  it.rows.forEach(r=>{const ind=canon(r.p);if(ind&&!isNaN(parseFloat(String(r.pct).replace(',','.')))){rows.push({id:'',nombre:'',punto:pn,ind,meta:100,res:num(r.pct),po:1,periodo:f.slice(0,7),fecha:f});n++}})});
  S.cumpl=mergeLocked(S.cumpl,rows,kC);const lk=LOCKED,np=I.items.length;S.img=null;
  S.msg='Guardado: '+np+' puntos, '+n+' productos'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+'.';save();render();
  if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
-
 function wordsFrom(d){if(d.words&&d.words.length)return d.words.map(w=>({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1}));
  return String(d.tsv||'').split('\n').map(l=>l.split('\t')).filter(c=>c[0]=='5'&&(c[11]||'').trim()).map(c=>({t:c[11].trim(),x0:+c[6],y0:+c[7],x1:+c[6]+ +c[8],y1:+c[7]+ +c[9]}))}
 function parsePivot(W){
