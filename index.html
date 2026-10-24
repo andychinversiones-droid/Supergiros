@@ -99,10 +99,10 @@ function render(){hdr();
  if(S.mode===null){document.getElementById('app').innerHTML='<p class="mu">Cargando…</p>';return}
  if(S.mode=='asesor'||location.hash=='#asesor')return renderAs();
  const pts=build(),A=document.getElementById('app');
- let h=(S.img?imgHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos CH millonario y CH millonario 1 a 5, Tripletazo, Baloto, Miloto, Lotería virtual, Kash, Superchance y Raspa y listo. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
+ let h=(S.img?imgHtml():'')+(S.imgA?imgAHtml():'')+`<div class="card"><b>1. Sube tus archivos</b><p class="mu">Excel o CSV. Puntos: nombre del punto, ciudad, responsable. Personal: cédula, nombre, cargo, punto. Cumplimiento punto: punto, fecha (una fila por punto por día) y, por cada producto (Chance, Lotería virtual, Lotería física, Baloto, Astro millonario, Kash, Raspa y gana, Recargas, Betplay), su Meta y su Real. TAREA DIARIA: igual, con los productos CH millonario y CH millonario 1 a 5, Tripletazo, Baloto, Miloto, Lotería virtual, Kash, Superchance y Raspa y listo. TU TAREA DE HOY: cédula, nombre, fecha, producto, valor a realizar, tarea de ayer y real de ayer (si dejas cédula y nombre vacíos, aplica a todos los asesores).</p>
  <div class="row"><label class="b">📍 Puntos de venta<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'v')"></label>
  <label class="b">👥 Personal<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'p')"></label>
- <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
+ <label class="b">📊 Cumplimiento punto<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'c')"></label><label class="b">📷 Imágenes<input type="file" accept="image/*" multiple onchange="imgUp(this.files)"></label><label class="b">📋 Cumplimiento TAREA DIARIA<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'t')"></label><label class="b">📷 Imágenes cumplimiento asesores<input type="file" accept="image/*" multiple onchange="imgAUp(this.files)"></label><label class="b">🎯 Tu tarea de hoy<input type="file" accept=".xlsx,.xls,.csv" onchange="read(this.files[0],'h')"></label>
  <button class="s" onclick="delDia()">🗑 Borrar un día cargado hoy</button></div>
  <div class="row" style="margin-top:8px"><button onclick="pub()">🔑 Publicar accesos de asesores</button><button class="s" onclick="S.mode='asesor';render()">Ver como asesor</button></div>
  <div class="row" style="margin-top:8px"><label class="b">📷 Fotos de asesores<input type="file" accept="image/*" multiple onchange="fotos(this.files)"></label></div><p class="mu">Fotos: nombra cada archivo con la cédula del asesor (ej. 1001.jpg). Puedes subir varias a la vez.</p>
@@ -289,7 +289,8 @@ async function myPhoto(f){if(!f||!ADV)return;
   render()})}
 const KNOWN=[...new Set([...PRODS,...PRODT])];
 const lev=(a,b)=>{const m=[];for(let i=0;i<=a.length;i++)m[i]=[i];for(let j=1;j<=b.length;j++)m[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]==b[j-1]?0:1));return m[a.length][b.length]};
-const canon=n=>{n=String(n).trim();if(!n)return '';const k=norm(n);let f=KNOWN.find(p=>norm(p)==k);if(f)return f;
+const ALIAS={'local chance millonario':'CH millonario','chance millonario':'CH millonario','ch millonario':'CH millonario'};
+const canon=n=>{n=String(n).trim();if(!n)return '';const k=norm(n);if(ALIAS[k])return ALIAS[k];let f=KNOWN.find(p=>norm(p)==k);if(f)return f;
  if(k.length>5){f=KNOWN.map(p=>[p,lev(k,norm(p))]).filter(x=>x[1]<=2&&norm(x[0]).length>5).sort((a,b)=>a[1]-b[1])[0];if(f)return f[0]}
  return n.charAt(0).toUpperCase()+n.slice(1).toLowerCase()};
 const yday=()=>{const d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -357,15 +358,75 @@ async function imgSave(){const I=S.img,bf=toISO(I.fecha);
  S.cumpl=mergeLocked(S.cumpl,rows,kC);const lk=LOCKED,np=I.items.length;S.img=null;
  S.msg='Guardado: '+np+' puntos, '+n+' productos'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+'.';save();render();
  if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
+
+function wordsFrom(d){if(d.words&&d.words.length)return d.words.map(w=>({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1}));
+ return String(d.tsv||'').split('\n').map(l=>l.split('\t')).filter(c=>c[0]=='5'&&(c[11]||'').trim()).map(c=>({t:c[11].trim(),x0:+c[6],y0:+c[7],x1:+c[6]+ +c[8],y1:+c[7]+ +c[9]}))}
+function parsePivot(W){
+ if(!W.length)return{items:[]};
+ const H=W.map(w=>w.y1-w.y0).sort((a,b)=>a-b)[Math.floor(W.length/2)]||14;
+ const isNum=t=>/^\d{1,3}([.,]\d{3})+$|^\d{1,6}$/.test(t),ced=w=>(!/[.,]/.test(w.t)&&/^\D?\d{7,12}$/.test(w.t))?w.t.replace(/\D/g,''):'';
+ const ws=[...W].sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),rows=[];
+ ws.forEach(w=>{const yc=(w.y0+w.y1)/2,r=rows[rows.length-1];if(r&&Math.abs(yc-r.yc)<H*0.6){r.w.push(w);r.yc=(r.yc*(r.w.length-1)+yc)/r.w.length}else rows.push({yc,w:[w]})});
+ rows.forEach(r=>r.w.sort((a,b)=>a.x0-b.x0));
+ const di=rows.findIndex(r=>r.w.some(ced));if(di<0)return{items:[]};
+ const hr=rows.slice(0,di).reverse().find(r=>r.w.some(w=>/ENDEDOR/i.test(w.t)));if(!hr)return{items:[]};
+ const vx=hr.w.find(w=>/ENDEDOR/i.test(w.t)).x1,hw=hr.w.filter(w=>w.x0>vx&&/[A-Za-zÁÉÍÓÚÑ]{3,}/.test(w.t)),cols=[];
+ hw.forEach(w=>{const t=w.t.replace(/^[^A-Za-zÁÉÍÓÚÑ]+/,''),c=cols[cols.length-1];if(c&&w.x0-c.x1<Math.max(18,1.4*H)){c.t+=' '+t;c.x1=w.x1}else cols.push({t,x0:w.x0,x1:w.x1})});
+ if(!cols.length)return{items:[]};
+ let ix=1e9;rows.slice(di).forEach(r=>{const k=r.w.findIndex(ced);if(k>0&&/^\D?\d$/.test(r.w[k-1].t))ix=Math.min(ix,r.w[k-1].x0)});
+ const x0=cols[0].x0-5,items=[];
+ rows.slice(di).forEach(r=>{const ci=r.w.findIndex(ced);if(ci<0)return;
+  const after=r.w.slice(ci+1),nombre=after.filter(w=>w.x0<x0&&/[A-Za-zÁÉÍÓÚÑ]{2,}/.test(w.t)).map(w=>w.t).join(' ').replace(/\s+/g,' ').trim(),vals=[];
+  after.filter(w=>(w.x0+w.x1)/2>=x0&&isNum(w.t)).forEach(w=>{const c=(w.x0+w.x1)/2;let j=0;cols.forEach((k,i)=>{if(c>=k.x0-5)j=i});vals.push({p:canon(cols[j].t),v:parseInt(w.t.replace(/[.,]/g,''),10)})});
+  let cd=ced(r.w[ci]);if(ix<1e9&&r.w[ci].x0<=ix+3&&cd.length>7)cd=cd.slice(1);if(vals.length)items.push({ced:cd,nombre,vals,open:false})});
+ return{items,cols:cols.map(c=>c.t)}}
+function matchCed(raw){const d=String(raw).replace(/\D/g,''),c=[...new Set([d,d.slice(-10),d.slice(1),d.slice(2)])].filter(x=>x.length>=6);
+ for(const k of c){const p=S.personal.find(x=>String(x.id).replace(/\D/g,'')==k);if(p)return{id:p.id,nombre:p.nombre,ok:true}}
+ return{id:d.length>10?d.slice(-10):d,nombre:'',ok:false}}
+async function imgAUp(files){files=[...(files||[])];if(!files.length)return;
+ S.msg='Leyendo imágenes… la primera vez puede tardar un minuto.';render();
+ const g=new Map();let bad=0,dup=0;
+ try{const w=await Tesseract.createWorker('eng');await w.setParameters({tessedit_pageseg_mode:'6'});
+  for(let i=0;i<files.length;i++){S.msg='Leyendo imagen '+(i+1)+' de '+files.length+'…';render();
+   try{const r=await w.recognize(files[i]),P=parsePivot(wordsFrom(r.data));if(!P.items.length){bad++;continue}
+    P.items.forEach(it=>{const m=matchCed(it.ced),k=m.ok?m.id:it.ced;let x=g.get(k);if(x)dup++;else{x={ced:m.ok?m.id:it.ced,nombre:m.ok?m.nombre:it.nombre,ok:m.ok,vals:[],open:false};g.set(k,x)}
+     it.vals.forEach(v=>{const j=x.vals.findIndex(y=>norm(y.p)==norm(v.p));if(j>=0)x.vals[j]=v;else x.vals.push(v)})})}catch(e){bad++}}
+  await w.terminate()}
+ catch(e){S.msg='No pude leer las imágenes ('+((e&&e.message)||e)+').';return render()}
+ if(!g.size){S.msg='No pude leer asesores con valores en esas imágenes. Prueba con capturas más nítidas.';return render()}
+ S.imgA={fecha:yday(),items:[...g.values()]};const sin=S.imgA.items.filter(x=>!x.ok).length;
+ S.msg=g.size+' asesor(es) leído(s)'+(dup?'; '+dup+' repetido(s) se unieron':'')+(sin?'; ⚠ '+sin+' con cédula que no está en Personal':'')+(bad?'; '+bad+' imagen(es) no se pudieron leer':'')+'. Revisa la fecha y guarda.';render()}
+function imgAHtml(){const I=S.imgA;
+ return `<div class="card"><b>📷 Cumplimiento de asesores (valores)</b><p class="mu">Revisa y corrige antes de guardar. Los valores se guardan en la fecha que indiques.</p>
+ <p class="mu" style="margin:6px 0 0">Fecha del cumplimiento (normalmente el día anterior):</p>
+ <input type="date" value="${esc(I.fecha)}" oninput="S.imgA.fecha=this.value">
+ ${I.items.map((it,n)=>`<details ${it.open?'open':''} ontoggle="S.imgA.items[${n}].open=this.open" style="margin:6px 0"><summary><b>${esc(it.nombre||'(sin nombre)')}</b> · ${esc(it.ced)} · ${it.vals.length} productos${it.ok?'':' ⚠ cédula no está en Personal'}</summary>
+ <input type="text" inputmode="numeric" value="${esc(it.ced)}" placeholder="Cédula" oninput="S.imgA.items[${n}].ced=this.value">
+ <input type="text" value="${esc(it.nombre)}" placeholder="Nombre" oninput="S.imgA.items[${n}].nombre=this.value">
+ ${it.vals.map((r,i)=>`<div class="row" style="flex-wrap:nowrap"><input type="text" value="${esc(r.p)}" oninput="S.imgA.items[${n}].vals[${i}].p=this.value"><input type="text" inputmode="numeric" value="${r.v}" style="width:110px" oninput="S.imgA.items[${n}].vals[${i}].v=this.value"><button class="s" onclick="S.imgA.items[${n}].vals.splice(${i},1);S.imgA.items[${n}].open=true;render()">✖</button></div>`).join('')}
+ <button class="s" onclick="S.imgA.items.splice(${n},1);render()">Quitar este asesor</button></details>`).join('')}
+ <div class="row" style="margin-top:8px"><button onclick="imgASave()">✅ Guardar todo (${I.items.length})</button><button class="s" onclick="S.imgA=null;render()">Cancelar</button></div></div>`}
+async function imgASave(){const I=S.imgA,f=toISO(I.fecha);
+ if(!f||f>=tod()){S.msg='La fecha debe ser anterior a hoy: es el cumplimiento del día anterior.';return render()}
+ const rows=[];let n=0,sin=0;
+ I.items.forEach(it=>{const m=matchCed(it.ced),id=m.ok?m.id:String(it.ced).replace(/\D/g,''),nombre=m.ok?m.nombre:it.nombre;if(!m.ok)sin++;
+  it.vals.forEach(r=>{const ind=canon(r.p),v=parseInt(String(r.v).replace(/[^\d]/g,''),10);if(ind&&!isNaN(v)){rows.push({id,nombre,punto:'',ind,meta:0,res:v,periodo:f.slice(0,7),fecha:f});n++}})});
+ S.tarea=mergeLocked(S.tarea,rows,kT);const lk=LOCKED,na=I.items.length;S.imgA=null;
+ S.msg='Guardado: '+na+' asesores, '+n+' valores ('+f+')'+(lk?'. ⚠ '+lk+' no se cambiaron porque ya son de días anteriores':'')+(sin?'. ⚠ '+sin+' asesor(es) con cédula que no está en Personal: no se verán hasta que los agregues':'')+'.';save();render();
+ if(DB&&LOADED){const m0=S.msg;await pub();S.msg=m0+' · '+S.msg;render()}}
+function ayerHtml(){const T=tod(),t=HD||T,ds=[...new Set((ADV.tdias||[]).map(x=>x[0]))].filter(d=>d<t).sort(),p=ds[ds.length-1];
+ if(!p)return '<p class="mu">Aún no hay cumplimiento del día anterior cargado.</p>';
+ const M=new Map(),add=(k,a,v)=>{const q=norm(canon(k));let e=M.get(q);if(!e){e={k:canon(k),task:null,real:null};M.set(q,e)}e[a]=(e[a]||0)+v};
+ (ADV.tdias||[]).filter(x=>x[0]==p).forEach(x=>add(x[1],'real',x[3]));(ADV.hoy||[]).filter(x=>x[0]==p).forEach(x=>add(x[1],'task',x[2]));
+ const L=[...M.values()].map(e=>({...e,pc:e.task>0&&e.real!=null?e.real/e.task*100:null})),pcs=L.filter(e=>e.pc!=null).map(e=>e.pc),pa=pcs.length?pcs.reduce((s,x)=>s+x,0)/pcs.length:null,f=v=>v==null?'—':v.toLocaleString();
+ return `<p class="mu" style="margin:0 0 6px">${esc(fmtD(p))}</p><div class="tw"><table><tr><th>Producto</th><th>Tarea</th><th>Real</th><th>%</th></tr>${L.map(e=>`<tr><td>${esc(e.k)}</td><td>${f(e.task)}</td><td>${f(e.real)}</td><td>${e.pc==null?'—':pill(e.pc,1)}</td></tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día</b>${pill(pa,1)}</div>`}`}
 function warn(kind,rows){if(!rows.length)return ' ⚠ No encontré filas de datos. Revisa que los títulos estén en la primera fila.';
  if(kind=='h'){const ok=rows.filter(r=>toISO(pick(r,['fecha','dia']))&&String(pick(r,['producto','indicador'])).trim()).length;if(ok<rows.length)return ' ⚠ Solo '+ok+' filas tienen Fecha y Producto reconocidos. Revisa esas dos columnas.'}return LOCKED?' ⚠ '+LOCKED+' filas no se cambiaron: ya son de días anteriores y no se pueden modificar.':''}
 function hoyNav(n){const c=new Date((HD||tod())+'T12:00:00');c.setDate(c.getDate()+n);const s=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0')+'-'+String(c.getDate()).padStart(2,'0');HD=s>=tod()?'':s;render()}
 function hoyHtml(){const T=tod(),t=HD||T;
- const nav=`<div class="row sp"><button class="s" onclick="hoyNav(-1)">◀</button><b>${t==T?'Hoy · ':''}${esc(new Date(t+'T12:00:00').toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'}))}</b><button class="s" onclick="hoyNav(1)">▶</button></div>`;
+ const nav=`<div class="row sp"><button class="s" onclick="hoyNav(-1)">◀</button><b>${t==T?'Hoy · ':''}${esc(fmtD(t))}</b><button class="s" onclick="hoyNav(1)">▶</button></div>`;
  const L=(ADV.hoy||[]).filter(x=>x[0]==t);if(!L.length)return nav+`<p class="mu">${t==T?'No tienes tarea asignada para hoy.':'No hay tarea registrada para este día.'}</p>`;
- const ay=L.some(x=>x[3]!=null||x[4]!=null),f=v=>v==null?'—':v.toLocaleString();
- const pcs=L.filter(x=>x[3]>0&&x[4]!=null).map(x=>x[4]/x[3]*100),pa=pcs.length?pcs.reduce((s,x)=>s+x,0)/pcs.length:null;
- return nav+`<div class="tw"><table><tr><th>Producto</th><th>${t==T?'Hoy':'Tarea'}</th>${ay?'<th>Ayer: tarea</th><th>Real</th><th>%</th>':''}</tr>${L.map(([q,k,v,a,r])=>`<tr><td>${esc(k)}</td><td>${v.toLocaleString()}</td>${ay?`<td>${f(a)}</td><td>${f(r)}</td><td>${a>0&&r!=null?pill(r/a*100,1):'—'}</td>`:''}</tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día anterior</b>${pill(pa,1)}</div>`}`}
+ return nav+`<div class="tw"><table><tr><th>Producto</th><th>Tarea</th></tr>${L.map(([q,k,v])=>`<tr><td>${esc(k)}</td><td>${v.toLocaleString()}</td></tr>`).join('')}</table></div>`}
 function renderAs(){
  const A=document.getElementById('app');
  const back=isOwn()&&location.hash=='#admin'?`<button class="s" onclick="ADV=null;S.mode='admin';render()">← Administrador</button>`:'';
@@ -376,6 +437,7 @@ function renderAs(){
  const tb=a=>tb2(a);
  A.innerHTML=`<div class="card"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><div><b style="font-size:17px">${esc(ADV.nombre)}</b><div class="mu">${esc(ADV.cargo)} · ${esc(ADV.punto)}</div>${S.msg?`<div class="mu" style="margin-top:6px">${esc(S.msg)}</div>`:''}<div style="margin-top:10px"><button class="s" onclick="ADV=null;render()">Salir</button></div></div><div style="text-align:center;flex:none">${ADV.foto?`<img class="av" style="width:96px;height:96px" src="${ADV.foto}" alt="Mi foto">`:`<div class="av" style="width:96px;height:96px;display:grid;place-items:center;font-size:40px">👤</div>`}</div></div></div>
  <div class="card"><b>🎯 Tu tarea de hoy es</b>${hoyHtml()}</div>
+ <div class="card"><b>✅ Tu cumplimiento de ayer</b>${ayerHtml()}</div>
  
  
  <div class="card"><div class="row sp"><b>Mi punto: ${esc(ADV.punto)}</b>${pill(ppd,ptd.length)}</div>${bar(ppd)}${lbl?`<p><b>📅 Cumplimiento del ${esc(lbl)}</b></p>`:''}<p class="mu">${[ADV.ciudad,ADV.resp&&'Resp.: '+ADV.resp].filter(Boolean).map(esc).join(' · ')}</p>${ptd.length?tb(ptd):''}<p><b>📅 Calendario de mi punto</b></p>${calHtml(ADV.dias||[],'c','Chance')}</div>`;
