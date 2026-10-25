@@ -254,7 +254,7 @@ async function loadDB(){
 async function pub(){
  if(!DB){S.msg='No hay conexión con el servidor.';return render()}
  if(!LOADED){S.msg='El historial guardado aún no cargó. Espera un momento y vuelve a intentar.';return render()}
- const pts=build();let n=0,np=0;
+ const pts=build(),RANK=rankAll();let n=0,np=0;
  try{
   await DB.doc('config/app').set({logo:S.logo||'',pmap:S.pmap||{},wipeV1:true});
   let oi=0;
@@ -270,7 +270,7 @@ async function pub(){
    S.hoy.filter(t=>!t.id&&!t.nombre).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
    S.hoy.filter(t=>t.id||t.nombre).filter(mn).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
    const A=P.ases[p.nombre]||{};
-   await ref.set({pin:pin,ord:S.personal.indexOf(p),nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),id:did(p.id),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),hoy:capD([...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra,t.cargado||'']),365,0),tdias:capD((A.days||[]).map(d=>[d.f,d.i,d.m,d.r,0,d.cg||'']),700,0),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:(A.items||[]).map(i=>({ind:i.ind,periodo:String(i.periodo||''),meta:i.meta,res:i.res}))});n++}
+   await ref.set({rank:RANK[String(p.id)]||null,pin:pin,ord:S.personal.indexOf(p),nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),id:did(p.id),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),hoy:capD([...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra,t.cargado||'']),365,0),tdias:capD((A.days||[]).map(d=>[d.f,d.i,d.m,d.r,0,d.cg||'']),700,0),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:(A.items||[]).map(i=>({ind:i.ind,periodo:String(i.periodo||''),meta:i.meta,res:i.res}))});n++}
   S.msg='Historial guardado: '+n+' asesores y '+np+' puntos. Clave = columna "Clave" del archivo de personal; si no la pones, son los últimos 4 dígitos de la cédula.'
  }catch(e){S.msg='Error al publicar accesos: '+(e.message||e)}
  render();
@@ -280,7 +280,7 @@ async function login(){
  if(!DB){S.msg='No hay conexión con el servidor. Intenta de nuevo.';return render()}
  if(tries>=5){S.msg='Demasiados intentos. Intenta más tarde.';return render()}
  try{const key=await sha(ci+':'+cl),d=await DB.doc('asesores/'+key).get();
-  if(d.exists){ADV=d.data();ADV.id=ci;ADV.key=key;tries=0;S.msg='';try{const pd=await DB.doc('puntos/'+did(ADV.punto)).get();ADV.dias=pd.exists?(pd.data().dias||[]):(ADV.dias||[])}catch(e2){ADV.dias=[]}}
+  if(d.exists){RK=false;ADV=d.data();ADV.id=ci;ADV.key=key;tries=0;S.msg='';try{const pd=await DB.doc('puntos/'+did(ADV.punto)).get();ADV.dias=pd.exists?(pd.data().dias||[]):(ADV.dias||[])}catch(e2){ADV.dias=[]}}
   else{tries++;S.msg='Cédula o clave incorrecta.'}}
  catch(e){S.msg='No se pudo consultar. Revisa la cédula e intenta de nuevo.'}
  render();
@@ -519,11 +519,29 @@ function ayerHtml(){const T=tod(),t=HD||T,ds=[...new Set((ADV.tdias||[]).map(x=>
  return `<p class="mu" style="margin:0 0 6px">${esc(fmtD(p))}</p><div class="tw"><table><tr><th>Producto</th><th>Tarea</th><th>Real</th><th>%</th></tr>${L.map(e=>`<tr><td>${esc(e.k)}</td><td>${f(e.task)}</td><td>${f(e.real)}</td><td>${e.pc==null?'—':pill(e.pc,1)}</td></tr>`).join('')}</table></div>${pa==null?'':`<div class="row sp" style="margin-top:8px"><b>Cumplimiento del día</b>${pill(pa,1)}</div>`}`}
 function warn(kind,rows){if(!rows.length)return ' ⚠ No encontré filas de datos. Revisa que los títulos estén en la primera fila.';
  if(kind=='h'){const ok=rows.filter(r=>toISO(pick(r,['fecha','dia']))&&String(pick(r,['producto','indicador'])).trim()).length;if(ok<rows.length)return ' ⚠ Solo '+ok+' filas tienen Fecha y Producto reconocidos. Revisa esas dos columnas.'}return LOCKED?' ⚠ '+LOCKED+' filas no se cambiaron: ya son de días anteriores y no se pueden modificar.':''}
+let RK=false;
+function rankAll(){
+ const D=new Set(S.tarea.map(r=>r.fecha).filter(Boolean)),pk=n=>norm(canonT(n)||n),out=[];
+ S.personal.forEach(p=>{if(!p.id)return;
+  const mn=t=>(t.id&&String(t.id)==String(p.id))||(!t.id&&norm(t.nombre)==norm(p.nombre)),tm=new Map();
+  S.hoy.filter(t=>!t.id&&!t.nombre).forEach(t=>tm.set(t.fecha+'|'+pk(t.prod),t));S.hoy.filter(t=>t.id||t.nombre).filter(mn).forEach(t=>tm.set(t.fecha+'|'+pk(t.prod),t));
+  const rl={};S.tarea.filter(r=>(r.id&&String(r.id)==String(p.id))||(!r.id&&norm(r.nombre)==norm(p.nombre))).forEach(r=>{const k=r.fecha+'|'+pk(r.ind);rl[k]=(rl[k]||0)+(+r.res||0)});
+  let ok=0,no=0,pend=0;tm.forEach((t,k)=>{if(!(t.valor>0))return;if(!D.has(t.fecha)){pend++;return}(rl[k]||0)>=t.valor?ok++:no++});
+  out.push({id:String(p.id),ok,no,pend,pts:ok})});
+ const act=out.filter(x=>x.ok+x.no>0).sort((a,b)=>b.pts-a.pts||(b.ok/(b.ok+b.no))-(a.ok/(a.ok+a.no))),res={};
+ act.forEach((x,i)=>{x.pos=(i&&x.pts==act[i-1].pts)?res[act[i-1].id].pos:i+1;x.total=act.length;res[x.id]=x});
+ out.forEach(x=>{if(!res[x.id])res[x.id]={...x,pos:null,total:act.length}});
+ const board=act.map(x=>({id:x.id,n:(S.personal.find(p=>String(p.id)==x.id)||{}).nombre||'',pos:x.pos,ok:x.ok,no:x.no}));Object.values(res).forEach(x=>{x.board=board});return res}
+function rankHtml(){const R=ADV.rank;if(!R)return '<p class="mu">Aún no hay resultados para calcular tu posición.</p>';if(R.pos==null)return '<p class="mu">Aún no tienes resultados para calcular tu posición.</p>'+rankBoard(R);
+ return `<div style="text-align:center;margin-top:8px"><div style="font-size:44px;font-weight:800">#${R.pos}</div><div class="mu">de ${R.total} asesores</div></div>
+ <div class="row sp" style="margin-top:10px"><span>✅ Tareas cumplidas</span><b>${R.ok}</b></div>
+ <div class="row sp"><span>❌ Tareas no cumplidas</span><b>${R.no}</b></div>${rankBoard(R)}`}
+function rankBoard(R){const me=did(ADV.id||'');return (R.board||[]).length?`<p class="mu" style="margin:12px 0 4px">Así va el ranking:</p><div class="tw"><table><tr><th>#</th><th>Asesor</th><th>✅</th><th>❌</th></tr>${R.board.map(b=>`<tr${did(b.id)==me?' style="font-weight:700;background:rgba(255,90,95,.18)"':''}><td>${b.pos}</td><td>${esc(b.n)}${did(b.id)==me?' (tú)':''}</td><td>${b.ok}</td><td>${b.no}</td></tr>`).join('')}</table></div>`:''}
 function previewAdv(id){const p=S.personal.find(x=>String(x.id)==String(id));if(!p)return;const pts=build(),key=Object.keys(pts).find(k=>norm(k)==norm(p.punto))||p.punto,P=pts[key]||{name:p.punto,items:[],ases:{},days:[]};
  const agg={};P.items.forEach(i=>{const a=agg[i.ind]??={ind:i.ind,meta:0,res:0};a.meta+=i.meta;a.res+=i.res});
  const A=P.ases[p.nombre]||{},hm=new Map(),mn=t=>(t.id&&t.id==p.id)||(!t.id&&norm(t.nombre)==norm(p.nombre));
  S.hoy.filter(t=>!t.id&&!t.nombre).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));S.hoy.filter(t=>t.id||t.nombre).filter(mn).forEach(t=>hm.set(t.fecha+'|'+norm(t.prod),t));
- ADV={id:p.id,nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:[],
+ RK=false;ADV={rank:rankAll()[String(p.id)]||null,id:p.id,nombre:p.nombre,cargo:String(p.cargo||''),punto:P.name,ciudad:String(P.ciudad||''),resp:String(P.resp||''),foto:S.fotos[did(p.id)]||'',pp:avg(P.items),nA:Object.keys(P.ases).length,pt:Object.values(agg),mine:[],
   hoy:[...hm.values()].map(t=>[t.fecha,t.prod,t.valor,t.ta,t.ra,t.cargado||'']),tdias:(A.days||[]).map(d=>[d.f,d.i,d.m,d.r,0,d.cg||'']),dias:(P.days||[]).map(d=>[d.f,d.i,d.m,d.r,d.po?1:0,d.cg||''])};
  S.mode='asesor';render()}
 function hoyNav(n){const c=new Date((HD||tod())+'T12:00:00');c.setDate(c.getDate()+n);const s=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0')+'-'+String(c.getDate()).padStart(2,'0');HD=s>=tod()?'':s;render()}
@@ -540,6 +558,7 @@ function renderAs(){
 
  const tb=a=>tb2(a);
  A.innerHTML=`<div class="card"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><div><b style="font-size:17px">${esc(ADV.nombre)}</b><div class="mu">${esc(ADV.cargo)} · ${esc(ADV.punto)}</div>${S.msg?`<div class="mu" style="margin-top:6px">${esc(S.msg)}</div>`:''}<div style="margin-top:10px"><button class="s" onclick="ADV=null;render()">Salir</button></div></div><div style="text-align:center;flex:none">${ADV.foto?`<img class="av" style="width:96px;height:96px" src="${ADV.foto}" alt="Mi foto">`:`<div class="av" style="width:96px;height:96px;display:grid;place-items:center;font-size:40px">👤</div>`}${isOwn()?`<label class="b" style="display:block;margin-top:6px;padding:6px 8px;font-size:12px">📷 ${ADV.foto?'Cambiar':'Subir'} foto<input type="file" accept="image/*" onchange="myPhoto(this.files[0])"></label>`:''}</div></div></div>
+ <div class="card"><button onclick="RK=!RK;render()">🏆 RANKING</button>${RK?rankHtml():''}</div>
  <div class="card"><b>🎯 Tu tarea de hoy es</b>${hoyHtml()}</div>
  <div class="card"><b>✅ Tu cumplimiento de ayer</b>${ayerHtml()}</div>
  
